@@ -1,0 +1,28 @@
+---
+description: Overview of the Growth Machine project - a lead generation and enrichment tool
+alwaysApply: true
+---
+
+# Growth Machine Project Overview
+
+**Growth Machine** is a Next.js application for preparing marketing campaigns through comprehensive lead management.
+
+## Core Features
+
+- Lead scraping and enrichment (using Apify scrapers)
+- Company and person data enrichment with intent signals
+- Lead quality visualization and intelligent filtering
+- Campaign management (email, instant messaging)
+- Icebreaker generation with customizable prompts
+- Export leads-list (format csv).
+
+## Tech Stack
+
+- **Frontend**: Next.js with modern UI components
+- **Backend**: n8n for scraping, enrichment, and intent data workflows
+- **Database**: Neon with Drizzle ORM
+- **Authentication**: User management system
+
+## Current Focus
+
+Setting up the application foundation: authentication, database schema, UI components (sidebar, navbar, breadcrumbs, toasts, skeletons), and user management pages.

@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "shadcn": {
+      "url": "https://www.shadcn.io/api/mcp"
+    },
+    "apify": {
+      "url": "https://mcp.apify.com"
+    }
+  }
+}
