@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { collections, leads, companies, scrapers } from "@/lib/schema";
+import { collections, leads, companies, scrapers, leadCollections } from "@/lib/schema";
 import { eq, and } from "drizzle-orm";
 import { getAdapter } from "@/lib/scrapers/adapter-factory";
 import {
@@ -105,7 +105,7 @@ export async function POST(
       );
     }
 
-    // Récupérer tous les leads de la collection avec leurs entreprises
+    // Récupérer tous les leads de la collection via lead_collections
     const collectionLeads = await db
       .select({
         id: leads.id,
@@ -119,8 +119,12 @@ export async function POST(
         },
       })
       .from(leads)
+      .innerJoin(leadCollections, and(
+        eq(leadCollections.leadId, leads.id),
+        eq(leadCollections.collectionId, collectionId),
+      ))
       .leftJoin(companies, eq(leads.companyId, companies.id))
-      .where(eq(leads.collectionId, collectionId));
+      .where(eq(leads.userId, userId));
 
     console.log(
       `[Enrichment Collection] User ${userId} enrichit collection ${collectionId} avec ${collectionLeads.length} leads`

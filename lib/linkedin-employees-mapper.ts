@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { leads, companies } from "./schema";
+import { leads, companies, leadCollections } from "./schema";
 import { eq, and, or } from "drizzle-orm";
 
 /**
@@ -362,19 +362,18 @@ export async function mapLinkedInEmployeesToLeads(
 
   for (const data of apifyData) {
     try {
-      // Vérifier si le lead existe déjà (par linkedinUrl ou publicIdentifier)
-      const conditions = [eq(leads.collectionId, collectionId)];
-
-      if (data.linkedinUrl) {
-        conditions.push(eq(leads.linkedinUrl, data.linkedinUrl));
-      }
-      if (data.publicIdentifier) {
-        conditions.push(eq(leads.publicIdentifier, data.publicIdentifier));
-      }
+      // Vérifier si le lead existe déjà dans cette collection (par linkedinUrl ou publicIdentifier)
+      const conditions = [eq(leads.userId, userId)];
+      if (data.linkedinUrl) conditions.push(eq(leads.linkedinUrl, data.linkedinUrl));
+      if (data.publicIdentifier) conditions.push(eq(leads.publicIdentifier, data.publicIdentifier));
 
       const existingLead = await db
-        .select()
+        .select({ lead: leads })
         .from(leads)
+        .innerJoin(leadCollections, and(
+          eq(leadCollections.leadId, leads.id),
+          eq(leadCollections.collectionId, collectionId)
+        ))
         .where(and(...conditions))
         .limit(1);
 
@@ -383,7 +382,7 @@ export async function mapLinkedInEmployeesToLeads(
         const companyName = extractCompanyName(data);
         const companyLinkedinUrlFromData = extractCompanyLinkedinUrl(data);
         const companyId = await getOrCreateCompany(companyName, companyLinkedinUrlFromData || companyLinkedinUrl || null);
-        await enrichLead(existingLead[0], data, companyId);
+        await enrichLead(existingLead[0].lead, data, companyId);
         enriched++;
         continue;
       }
@@ -414,9 +413,8 @@ export async function mapLinkedInEmployeesToLeads(
       // Parser registeredAt
       const registeredAt = parseRegisteredAt(data.registeredAt);
 
-      // Créer le lead
-      await db.insert(leads).values({
-        collectionId,
+      // Créer le lead (lié via lead_collections)
+      const [insertedLead] = await db.insert(leads).values({
         userId,
         companyId: companyId || null,
         personId: data.id || null,
@@ -442,7 +440,14 @@ export async function mapLinkedInEmployeesToLeads(
         city,
         state,
         country,
-      });
+      }).returning();
+
+      if (insertedLead) {
+        await db.insert(leadCollections).values({
+          leadId: insertedLead.id,
+          collectionId,
+        });
+      }
 
       created++;
     } catch (error) {

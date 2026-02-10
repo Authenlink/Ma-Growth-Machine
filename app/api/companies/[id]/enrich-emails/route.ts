@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { companies, leads, scrapers } from "@/lib/schema";
+import { companies, leads, scrapers, leadCollections } from "@/lib/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { getAdapter } from "@/lib/scrapers/adapter-factory";
 import { extractDomain } from "@/lib/bulk-email-finder-mapper";
@@ -95,16 +95,17 @@ export async function POST(
       );
     }
 
-    // Récupérer tous les leads de l'entreprise sans email pour l'utilisateur
-    const companyLeads = await db
+    // Récupérer tous les leads de l'entreprise sans email avec leur collection (via lead_collections)
+    const companyLeadsWithCollections = await db
       .select({
         id: leads.id,
         firstName: leads.firstName,
         lastName: leads.lastName,
         email: leads.email,
-        collectionId: leads.collectionId,
+        collectionId: leadCollections.collectionId,
       })
       .from(leads)
+      .innerJoin(leadCollections, eq(leadCollections.leadId, leads.id))
       .where(
         and(
           eq(leads.companyId, companyId),
@@ -112,6 +113,14 @@ export async function POST(
           isNull(leads.email)
         )
       );
+
+    // Prendre une seule collection par lead (la première) pour éviter les doublons
+    const seenLeadIds = new Set<number>();
+    const companyLeads = companyLeadsWithCollections.filter((lead) => {
+      if (seenLeadIds.has(lead.id)) return false;
+      seenLeadIds.add(lead.id);
+      return true;
+    });
 
     console.log(
       `[Enrichment Emails Company] User ${userId} enrichit entreprise ${companyId} avec ${companyLeads.length} leads sans email`
@@ -238,28 +247,19 @@ export async function POST(
     // Récupérer les résultats
     const items = await adapter.getResults(run.id);
 
-    // Pour chaque collection, mapper et sauvegarder les emails trouvés
-    // On groupe les leads par collectionId pour optimiser les appels
-    const leadsByCollection = new Map<number, typeof companyLeads>();
-    for (const lead of companyLeads) {
-      if (!leadsByCollection.has(lead.collectionId)) {
-        leadsByCollection.set(lead.collectionId, []);
-      }
-      leadsByCollection.get(lead.collectionId)!.push(lead);
-    }
-
+    // Appeler le mapper pour chaque collection représentée (car les leads peuvent être dans différentes collections)
+    const collectionIds = [...new Set(companyLeads.map((l) => l.collectionId).filter(Boolean))];
     let totalEnriched = 0;
     let totalSkipped = 0;
     let totalErrors = 0;
 
-    // Utiliser la première collection pour mapper (le mapper gère déjà la collection)
-    // En fait, on peut mapper tous les résultats en une fois car le mapper trouve les leads par nom + company
-    const firstCollectionId = companyLeads[0].collectionId;
-    const mappingResult = await adapter.mapToLeads(items, firstCollectionId, userId);
-
-    totalEnriched = mappingResult.enriched || 0;
-    totalSkipped = mappingResult.skipped || 0;
-    totalErrors = mappingResult.errors || 0;
+    for (const colId of collectionIds) {
+      if (!colId) continue;
+      const mappingResult = await adapter.mapToLeads(items, colId, userId);
+      totalEnriched += mappingResult.enriched || 0;
+      totalSkipped += mappingResult.skipped || 0;
+      totalErrors += mappingResult.errors || 0;
+    }
 
     console.log(
       `[Enrichment Emails Company] Enrichissement terminé pour entreprise ${companyId}:`,

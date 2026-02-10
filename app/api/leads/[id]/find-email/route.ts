@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { leads, companies, scrapers } from "@/lib/schema";
+import { leads, companies, scrapers, leadCollections } from "@/lib/schema";
 import { eq, and } from "drizzle-orm";
 import { getAdapter } from "@/lib/scrapers/adapter-factory";
 import { extractDomain } from "@/lib/bulk-email-finder-mapper";
@@ -16,7 +16,7 @@ const POLL_INTERVAL = 5000;
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const startTime = Date.now();
   let runId: string | null = null;
@@ -25,10 +25,7 @@ export async function POST(
     const session = await auth();
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: "Non authentifié" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
     const { id } = await params;
@@ -38,7 +35,7 @@ export async function POST(
     if (isNaN(leadId)) {
       return NextResponse.json(
         { error: "ID de lead invalide" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -49,7 +46,6 @@ export async function POST(
         firstName: leads.firstName,
         lastName: leads.lastName,
         email: leads.email,
-        collectionId: leads.collectionId,
         companyId: leads.companyId,
         company: {
           id: companies.id,
@@ -66,7 +62,7 @@ export async function POST(
     if (leadResult.length === 0) {
       return NextResponse.json(
         { error: "Lead non trouvé ou accès non autorisé" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -76,21 +72,23 @@ export async function POST(
     if (lead.email) {
       return NextResponse.json(
         { error: "Ce lead a déjà un email" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Vérifier qu'on a le prénom et le nom
     if (!lead.firstName || !lead.lastName) {
       return NextResponse.json(
-        { error: "Le lead doit avoir un prénom et un nom pour trouver l'email" },
-        { status: 400 }
+        {
+          error: "Le lead doit avoir un prénom et un nom pour trouver l'email",
+        },
+        { status: 400 },
       );
     }
 
     // Récupérer le domaine (priorité : domaine de l'entreprise, puis website de l'entreprise)
     let domain: string | null = null;
-    
+
     if (lead.company?.domain && lead.company.domain.trim() !== "") {
       domain = lead.company.domain.trim();
     } else if (lead.company?.website && lead.company.website.trim() !== "") {
@@ -99,11 +97,27 @@ export async function POST(
 
     if (!domain) {
       return NextResponse.json(
-        { 
-          error: "Le lead n'a pas de domaine disponible. Veuillez ajouter un domaine à l'entreprise associée ou mettre à jour le website de l'entreprise.",
-          needsDomain: true
+        {
+          error:
+            "Le lead n'a pas de domaine disponible. Veuillez ajouter un domaine à l'entreprise associée ou mettre à jour le website de l'entreprise.",
+          needsDomain: true,
         },
-        { status: 400 }
+        { status: 400 },
+      );
+    }
+
+    // Récupérer la première collection du lead (pour le mapper)
+    const leadCollectionResult = await db
+      .select({ collectionId: leadCollections.collectionId })
+      .from(leadCollections)
+      .where(eq(leadCollections.leadId, leadId))
+      .limit(1);
+
+    const collectionIdForMapper = leadCollectionResult[0]?.collectionId;
+    if (!collectionIdForMapper) {
+      return NextResponse.json(
+        { error: "Ce lead n'est associé à aucune collection" },
+        { status: 400 },
       );
     }
 
@@ -114,15 +128,15 @@ export async function POST(
       .where(
         and(
           eq(scrapers.mapperType, "bulk-email-finder"),
-          eq(scrapers.isActive, true)
-        )
+          eq(scrapers.isActive, true),
+        ),
       )
       .limit(1);
 
     if (scraperResult.length === 0) {
       return NextResponse.json(
         { error: "Scraper Bulk Email Finder non trouvé" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -131,7 +145,7 @@ export async function POST(
     // Créer l'adapter
     const adapter = getAdapter(
       scraperConfig.mapperType,
-      (scraperConfig.providerConfig || {}) as Record<string, unknown>
+      (scraperConfig.providerConfig || {}) as Record<string, unknown>,
     );
 
     // Préparer les paramètres pour le scraper
@@ -141,14 +155,16 @@ export async function POST(
     };
 
     console.log(
-      `[Find Email] User ${userId} cherche l'email pour lead ${leadId}: ${personString}`
+      `[Find Email] User ${userId} cherche l'email pour lead ${leadId}: ${personString}`,
     );
 
     // Exécuter le scraping
     const run = await adapter.execute(scrapingParams);
     runId = run.id;
 
-    console.log(`[Find Email] Run créé: ${runId}, statut initial: ${run.status}`);
+    console.log(
+      `[Find Email] Run créé: ${runId}, statut initial: ${run.status}`,
+    );
 
     // Attendre que le run se termine avec polling
     let runStatus = await adapter.getStatus(run.id);
@@ -168,12 +184,14 @@ export async function POST(
 
       if (attempts % 6 === 0) {
         console.log(
-          `[Find Email] Run ${runId} toujours en cours: ${runStatus.status} (${attempts * POLL_INTERVAL / 1000}s)`
+          `[Find Email] Run ${runId} toujours en cours: ${runStatus.status} (${(attempts * POLL_INTERVAL) / 1000}s)`,
         );
       }
     }
 
-    console.log(`[Find Email] Run ${runId} terminé avec le statut: ${runStatus.status}`);
+    console.log(
+      `[Find Email] Run ${runId} terminé avec le statut: ${runStatus.status}`,
+    );
 
     // Vérifier le statut final
     if (runStatus.status !== "SUCCEEDED") {
@@ -181,10 +199,10 @@ export async function POST(
         runStatus.status === "FAILED"
           ? "La recherche d'email a échoué"
           : runStatus.status === "TIMED-OUT"
-          ? "La recherche d'email a dépassé le temps limite"
-          : runStatus.status === "ABORTED"
-          ? "La recherche d'email a été annulée"
-          : "La recherche d'email s'est terminée avec une erreur";
+            ? "La recherche d'email a dépassé le temps limite"
+            : runStatus.status === "ABORTED"
+              ? "La recherche d'email a été annulée"
+              : "La recherche d'email s'est terminée avec une erreur";
 
       console.error(`[Find Email] Erreur pour run ${runId}:`, errorMessage);
 
@@ -194,7 +212,7 @@ export async function POST(
           runId: run.id,
           status: runStatus.status,
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -209,18 +227,22 @@ export async function POST(
         typeof item === "object" &&
         item !== null &&
         "status" in item &&
-        item.status === "NOT_FOUND"
+        item.status === "NOT_FOUND",
     );
 
     // Mapper et sauvegarder les résultats
-    const mappingResult = await adapter.mapToLeads(items, lead.collectionId, userId);
+    const mappingResult = await adapter.mapToLeads(
+      items,
+      collectionIdForMapper,
+      userId,
+    );
 
     const duration = Math.round((Date.now() - startTime) / 1000);
 
     console.log(
       `[Find Email] Recherche terminée pour lead ${leadId}:`,
       `${mappingResult.enriched || 0} enrichi(s), ${mappingResult.skipped || 0} ignoré(s), ${mappingResult.errors || 0} erreur(s)`,
-      `(durée: ${duration}s)`
+      `(durée: ${duration}s)`,
     );
 
     // Récupérer le lead mis à jour pour retourner l'email trouvé
@@ -279,7 +301,7 @@ export async function POST(
         message: error instanceof Error ? error.message : "Erreur inconnue",
         runId,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -3,7 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Mail,
   Building2,
@@ -13,6 +13,7 @@ import {
   ArrowLeft,
   Search,
   AlertCircle,
+  Pencil,
 } from "lucide-react";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
@@ -44,6 +45,7 @@ import { useScroll } from "@/hooks/use-scroll";
 import { InformationTab } from "@/components/leads/information-tab";
 import { SocialMediaTab } from "@/components/leads/social-media-tab";
 import { ReportTab } from "@/components/leads/report-tab";
+import { EditLeadSheet } from "@/components/leads/edit-lead-sheet";
 import { toast } from "sonner";
 
 interface LinkedInPost {
@@ -98,10 +100,14 @@ interface LeadDetail {
     state: string | null;
     country: string | null;
   } | null;
+  collections: {
+    id: number;
+    name: string;
+  }[];
   collection: {
     id: number;
     name: string;
-  };
+  } | null; // Pour la compatibilité
 }
 
 export default function LeadDetailPage() {
@@ -113,6 +119,28 @@ export default function LeadDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [findingEmail, setFindingEmail] = useState(false);
+  const [editSheetOpen, setEditSheetOpen] = useState(false);
+
+  const fetchLead = useCallback(async () => {
+    if (status === "authenticated" && params.id) {
+      try {
+        const response = await fetch(`/api/leads/${params.id}`);
+        if (response.ok) {
+          const data = await response.json();
+          setLead(data);
+        } else if (response.status === 404) {
+          setError("Lead non trouvé");
+        } else {
+          setError("Erreur lors de la récupération du lead");
+        }
+      } catch (err) {
+        console.error("Erreur:", err);
+        setError("Erreur lors de la récupération du lead");
+      } finally {
+        setLoading(false);
+      }
+    }
+  }, [status, params.id]);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -121,29 +149,11 @@ export default function LeadDetailPage() {
   }, [status, router]);
 
   useEffect(() => {
-    const fetchLead = async () => {
-      if (status === "authenticated" && params.id) {
-        try {
-          const response = await fetch(`/api/leads/${params.id}`);
-          if (response.ok) {
-            const data = await response.json();
-            setLead(data);
-          } else if (response.status === 404) {
-            setError("Lead non trouvé");
-          } else {
-            setError("Erreur lors de la récupération du lead");
-          }
-        } catch (error) {
-          console.error("Erreur:", error);
-          setError("Erreur lors de la récupération du lead");
-        } finally {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchLead();
-  }, [status, params.id]);
+    if (status === "authenticated" && params.id) {
+      setLoading(true);
+      fetchLead();
+    }
+  }, [status, params.id, fetchLead]);
 
   const getDisplayName = () => {
     if (!lead) return "";
@@ -385,6 +395,15 @@ export default function LeadDetailPage() {
                         Non validé
                       </Badge>
                     )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditSheetOpen(true)}
+                      className="gap-1 ml-auto"
+                    >
+                      <Pencil className="h-4 w-4" />
+                      Modifier
+                    </Button>
                   </div>
                   {lead.position && (
                     <CardDescription className="text-base mt-2">
@@ -484,7 +503,7 @@ export default function LeadDetailPage() {
             </TabsList>
 
             <TabsContent value="information">
-              <InformationTab lead={lead} />
+              <InformationTab lead={lead} onLeadUpdate={(updatedLead) => setLead(updatedLead as LeadDetail)} />
             </TabsContent>
 
             <TabsContent value="social">
@@ -503,6 +522,15 @@ export default function LeadDetailPage() {
             </TabsContent>
           </Tabs>
         </div>
+
+        {lead && (
+          <EditLeadSheet
+            lead={lead}
+            open={editSheetOpen}
+            onOpenChange={setEditSheetOpen}
+            onSuccess={fetchLead}
+          />
+        )}
       </SidebarInset>
     </SidebarProvider>
   );

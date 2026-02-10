@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { collections, leads, companies } from "@/lib/schema";
-import { eq, sql } from "drizzle-orm";
+import { collections, leads, companies, leadCollections } from "@/lib/schema";
+import { eq, and, sql } from "drizzle-orm";
 
 // GET /api/collections/[id] - Récupère une collection spécifique avec ses leads
 export async function GET(
@@ -56,15 +56,21 @@ export async function GET(
       );
     }
 
-    // Compter le nombre total de leads dans la collection
+    const userId = parseInt(session.user.id);
+
+    // Compter le nombre total de leads dans la collection (via lead_collections)
     const totalCountResult = await db
       .select({ count: sql<number>`count(*)` })
-      .from(leads)
-      .where(eq(leads.collectionId, collectionId));
+      .from(leadCollections)
+      .innerJoin(leads, eq(leadCollections.leadId, leads.id))
+      .where(and(
+        eq(leadCollections.collectionId, collectionId),
+        eq(leads.userId, userId)
+      ));
 
-    const totalItems = totalCountResult[0]?.count || 0;
+    const totalItems = Number(totalCountResult[0]?.count ?? 0);
 
-    // Récupérer les leads de la collection avec les informations des entreprises
+    // Récupérer les leads de la collection via lead_collections
     const collectionLeads = await db
       .select({
         id: leads.id,
@@ -88,26 +94,33 @@ export async function GET(
           industry: companies.industry,
           size: companies.size,
         },
-        collection: {
-          id: collections.id,
-          name: collections.name,
-        },
         createdAt: leads.createdAt,
       })
       .from(leads)
+      .innerJoin(leadCollections, and(
+        eq(leadCollections.leadId, leads.id),
+        eq(leadCollections.collectionId, collectionId)
+      ))
       .leftJoin(companies, eq(leads.companyId, companies.id))
-      .innerJoin(collections, eq(leads.collectionId, collections.id))
-      .where(eq(leads.collectionId, collectionId))
+      .where(eq(leads.userId, userId))
       .orderBy(leads.createdAt)
       .limit(limit)
       .offset(offset);
 
     const totalPages = Math.ceil(totalItems / limit);
 
+    // Ajouter la collection courante à chaque lead (pour compatibilité avec LeadsTableView/LeadsCardView)
+    const currentCollection = { id: collection[0].id, name: collection[0].name };
+    const leadsWithCollection = collectionLeads.map((lead) => ({
+      ...lead,
+      collection: currentCollection,
+      collections: [currentCollection],
+    }));
+
     const response = {
       collection: collection[0],
       leads: {
-        data: collectionLeads,
+        data: leadsWithCollection,
         pagination: {
           page,
           limit,

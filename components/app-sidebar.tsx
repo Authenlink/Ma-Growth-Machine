@@ -6,6 +6,8 @@ import Image from "next/image";
 import {
   LayoutDashboard,
   Users,
+  Building2,
+  FolderOpen,
   Zap,
   Target,
   MessageSquare,
@@ -50,11 +52,23 @@ const navItems = [
     icon: Users,
     items: [
       { title: "Tous les leads", url: "/leads" },
-      { title: "Toutes les entreprises", url: "/companies" },
       { title: "Importer des leads", url: "/leads/import" },
       { title: "Ajouter un lead", url: "/leads/add" },
-      { title: "Collections", url: "/leads/collections" },
     ],
+  },
+  {
+    title: "Entreprises",
+    url: "/companies",
+    icon: Building2,
+    items: [
+      { title: "Toutes les entreprises", url: "/companies" },
+      { title: "Ajouter une entreprise", url: "/companies/add" },
+    ],
+  },
+  {
+    title: "Collections",
+    url: "/leads/collections",
+    icon: FolderOpen,
   },
   {
     title: "Enrichissement",
@@ -63,6 +77,8 @@ const navItems = [
     items: [
       { title: "Enrichir leads", url: "/enrichment?tab=lead" },
       { title: "Enrichir entreprise", url: "/enrichment?tab=company" },
+      { title: "Analyse SEO", url: "/enrichment/seo" },
+      { title: "Avis Trustpilot", url: "/enrichment/trustpilot" },
     ],
   },
   {

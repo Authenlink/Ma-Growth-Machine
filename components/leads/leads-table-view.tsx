@@ -1,7 +1,8 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { Mail, Linkedin, ExternalLink } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Mail, Linkedin, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { cleanIndustry } from "@/lib/utils";
 
@@ -27,18 +28,23 @@ interface Lead {
     industry: string | null;
     size: string | null;
   } | null;
+  collections: {
+    id: number;
+    name: string;
+  }[];
   collection: {
     id: number;
     name: string;
-  };
+  } | null; // Pour la compatibilité
   createdAt: Date;
 }
 
 interface LeadsTableViewProps {
   leads: Lead[];
+  onDeleteLead?: (leadId: number) => void;
 }
 
-export function LeadsTableView({ leads }: LeadsTableViewProps) {
+export function LeadsTableView({ leads, onDeleteLead }: LeadsTableViewProps) {
   const getDisplayName = (lead: Lead) => {
     if (lead.fullName) return lead.fullName;
     if (lead.firstName && lead.lastName) {
@@ -102,7 +108,7 @@ export function LeadsTableView({ leads }: LeadsTableViewProps) {
               <tr
                 key={lead.id}
                 className="border-b transition-colors hover:bg-muted/50 cursor-pointer"
-                onClick={() => window.location.href = `/leads/${lead.id}`}
+                onClick={() => (window.location.href = `/leads/${lead.id}`)}
               >
                 <td className="p-4 align-middle">
                   <Link
@@ -191,9 +197,26 @@ export function LeadsTableView({ leads }: LeadsTableViewProps) {
                   )}
                 </td>
                 <td className="p-4 align-middle">
-                  <Badge variant="outline" className="text-xs">
-                    {lead.collection.name}
-                  </Badge>
+                  <div className="flex flex-wrap gap-1">
+                    {lead.collections && lead.collections.length > 0 ? (
+                      lead.collections.slice(0, 2).map((collection) => (
+                        <Badge key={collection.id} variant="outline" className="text-xs">
+                          {collection.name}
+                        </Badge>
+                      ))
+                    ) : lead.collection ? (
+                      <Badge variant="outline" className="text-xs">
+                        {lead.collection.name}
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Aucune</span>
+                    )}
+                    {lead.collections && lead.collections.length > 2 && (
+                      <Badge variant="outline" className="text-xs">
+                        +{lead.collections.length - 2}
+                      </Badge>
+                    )}
+                  </div>
                 </td>
                 <td className="p-4 align-middle">
                   <div className="flex items-center gap-2">
@@ -208,6 +231,20 @@ export function LeadsTableView({ leads }: LeadsTableViewProps) {
                       >
                         <Linkedin className="h-4 w-4" />
                       </a>
+                    )}
+                    {onDeleteLead && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteLead(lead.id);
+                        }}
+                        title="Supprimer ce lead"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     )}
                   </div>
                 </td>

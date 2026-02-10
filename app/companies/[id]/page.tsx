@@ -14,6 +14,10 @@ import {
   ExternalLink,
   ArrowLeft,
   Briefcase,
+  Search,
+  Pencil,
+  Star,
+  Loader2,
 } from "lucide-react";
 import { cleanIndustry } from "@/lib/utils";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -44,12 +48,15 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useScroll } from "@/hooks/use-scroll";
 import { LeadsCardView } from "@/components/leads/leads-card-view";
+import { toast } from "sonner";
 import { ScrapeEmployeesDialog } from "@/components/companies/scrape-employees-dialog";
+import { EditCompanySheet } from "@/components/companies/edit-company-sheet";
 
 interface Company {
   id: number;
   name: string;
   website: string | null;
+  domain: string | null;
   linkedinUrl: string | null;
   foundedYear: number | null;
   industry: string | null;
@@ -61,6 +68,15 @@ interface Company {
   country: string | null;
   employeesScraped: boolean;
   employeesScrapedAt: Date | null;
+  seoScore: number | null;
+  seoScoreMobile: number | null;
+  seoScoreDesktop: number | null;
+  seoData: {
+    score?: number;
+    strategy?: string;
+    audits?: Record<string, { score?: number; title?: string }>;
+  } | null;
+  seoAnalyzedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -87,10 +103,14 @@ interface CompanyLead {
     industry: string | null;
     size: string | null;
   } | null;
+  collections: {
+    id: number;
+    name: string;
+  }[];
   collection: {
     id: number;
     name: string;
-  };
+  } | null; // Pour la compatibilité
   createdAt: Date;
 }
 
@@ -105,7 +125,47 @@ export default function CompanyDetailPage() {
   const [loadingLeads, setLoadingLeads] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [scrapeDialogOpen, setScrapeDialogOpen] = useState(false);
+  const [editSheetOpen, setEditSheetOpen] = useState(false);
   const [scraperId, setScraperId] = useState<number | null>(null);
+  const [trustpilotReviews, setTrustpilotReviews] = useState<
+    Array<{
+      id: number;
+      rating: number;
+      publishedDate: string | null;
+      title: string | null;
+      body: string | null;
+      createdAt: string;
+    }>
+  >([]);
+  const [trustpilotStats, setTrustpilotStats] = useState<{
+    count: number;
+    averageRating: number;
+  }>({ count: 0, averageRating: 0 });
+  const [hasMoreTrustpilot, setHasMoreTrustpilot] = useState(false);
+  const [loadingTrustpilot, setLoadingTrustpilot] = useState(false);
+  const [loadingMoreTrustpilot, setLoadingMoreTrustpilot] = useState(false);
+  const [scrapingTrustpilot, setScrapingTrustpilot] = useState(false);
+
+  const fetchCompany = async () => {
+    if (status === "authenticated" && params.id) {
+      try {
+        const response = await fetch(`/api/companies/${params.id}`);
+        if (response.ok) {
+          const data = await response.json();
+          setCompany(data);
+        } else if (response.status === 404) {
+          setError("Entreprise non trouvée");
+        } else {
+          setError("Erreur lors de la récupération de l'entreprise");
+        }
+      } catch (err) {
+        console.error("Erreur:", err);
+        setError("Erreur lors de la récupération de l'entreprise");
+      } finally {
+        setLoadingCompany(false);
+      }
+    }
+  };
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -114,28 +174,10 @@ export default function CompanyDetailPage() {
   }, [status, router]);
 
   useEffect(() => {
-    const fetchCompany = async () => {
-      if (status === "authenticated" && params.id) {
-        try {
-          const response = await fetch(`/api/companies/${params.id}`);
-          if (response.ok) {
-            const data = await response.json();
-            setCompany(data);
-          } else if (response.status === 404) {
-            setError("Entreprise non trouvée");
-          } else {
-            setError("Erreur lors de la récupération de l'entreprise");
-          }
-        } catch (error) {
-          console.error("Erreur:", error);
-          setError("Erreur lors de la récupération de l'entreprise");
-        } finally {
-          setLoadingCompany(false);
-        }
-      }
-    };
-
-    fetchCompany();
+    if (status === "authenticated" && params.id) {
+      setLoadingCompany(true);
+      fetchCompany();
+    }
   }, [status, params.id]);
 
   // Récupérer le scraper LinkedIn Company Employees
@@ -180,6 +222,91 @@ export default function CompanyDetailPage() {
 
     fetchLeads();
   }, [status, params.id]);
+
+  const fetchTrustpilotReviews = async (options?: {
+    limit?: number;
+    offset?: number;
+    append?: boolean;
+  }) => {
+    if (!params.id) return;
+    const limit = options?.limit ?? 3;
+    const offset = options?.offset ?? 0;
+    const append = options?.append ?? false;
+
+    if (append) {
+      setLoadingMoreTrustpilot(true);
+    } else {
+      setLoadingTrustpilot(true);
+    }
+
+    try {
+      const response = await fetch(
+        `/api/companies/${params.id}/trustpilot-reviews?limit=${limit}&offset=${offset}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        if (append) {
+          setTrustpilotReviews((prev) => [...prev, ...(data.data ?? [])]);
+        } else {
+          setTrustpilotReviews(data.data ?? []);
+        }
+        setTrustpilotStats(data.stats ?? { count: 0, averageRating: 0 });
+        setHasMoreTrustpilot(data.hasMore ?? false);
+      }
+    } catch (err) {
+      console.error("Erreur lors du chargement des avis Trustpilot:", err);
+    } finally {
+      setLoadingTrustpilot(false);
+      setLoadingMoreTrustpilot(false);
+    }
+  };
+
+  const loadMoreTrustpilot = () => {
+    fetchTrustpilotReviews({
+      limit: 10,
+      offset: trustpilotReviews.length,
+      append: true,
+    });
+  };
+
+  useEffect(() => {
+    if (status === "authenticated" && params.id) {
+      fetchTrustpilotReviews({ limit: 3 });
+    }
+  }, [status, params.id]);
+
+  const handleScrapeTrustpilot = async () => {
+    if (!company) return;
+    const hasDomain = !!(company.domain?.trim() || company.website?.trim());
+    if (!hasDomain) {
+      toast.error("Cette entreprise n'a pas de domaine (website). Ajoutez un website ou un domaine pour scraper les avis Trustpilot.");
+      return;
+    }
+    setScrapingTrustpilot(true);
+    try {
+      const res = await fetch("/api/trustpilot-reviews/scrape", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "single",
+          companyId: company.id,
+          maxItems: 100,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(`${data.metrics.created} avis créés`);
+        fetchTrustpilotReviews();
+        fetchCompany();
+      } else {
+        toast.error(data.error || "Erreur lors du scraping");
+      }
+    } catch (err) {
+      toast.error("Erreur lors du scraping Trustpilot");
+    } finally {
+      setScrapingTrustpilot(false);
+    }
+  };
 
   const getLocation = () => {
     if (!company) return null;
@@ -323,14 +450,32 @@ export default function CompanyDetailPage() {
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <CardTitle className="text-3xl mb-2">{company.name}</CardTitle>
-                  {company.industry && (
-                    <CardDescription className="text-base">
-                      {cleanIndustry(company.industry)}
-                      {company.size && ` • ${company.size}`}
-                    </CardDescription>
-                  )}
+                  <CardDescription className="text-base flex flex-wrap items-center gap-x-3 gap-y-1">
+                    {company.industry && (
+                      <span>
+                        {cleanIndustry(company.industry)}
+                        {company.size && ` • ${company.size}`}
+                      </span>
+                    )}
+                      {trustpilotStats.count > 0 && (
+                        <span className="flex items-center gap-1">
+                          <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                          {trustpilotStats.count} avis • Note moyenne:{" "}
+                          {(Number(trustpilotStats.averageRating) || 0).toFixed(1)}/5
+                        </span>
+                      )}
+                  </CardDescription>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setEditSheetOpen(true)}
+                    className="gap-1"
+                  >
+                    <Pencil className="h-4 w-4" />
+                    Modifier
+                  </Button>
                   {company.website && (
                     <Button variant="outline" size="sm" asChild>
                       <a
@@ -380,6 +525,9 @@ export default function CompanyDetailPage() {
               <TabsTrigger value="info">Informations</TabsTrigger>
               <TabsTrigger value="leads">
                 Leads ({leads.length})
+              </TabsTrigger>
+              <TabsTrigger value="trustpilot">
+                Avis Trustpilot ({trustpilotStats.count})
               </TabsTrigger>
             </TabsList>
 
@@ -463,6 +611,106 @@ export default function CompanyDetailPage() {
                   </Card>
                 )}
 
+                {/* SEO */}
+                {(company.seoScore != null || company.seoData) ? (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Search className="h-5 w-5" />
+                        Score SEO
+                      </CardTitle>
+                      <CardDescription>
+                        Analyse Google PageSpeed Insights
+                        {company.seoAnalyzedAt && (
+                          <span className="block mt-1 text-xs">
+                            Dernière analyse:{" "}
+                            {new Date(company.seoAnalyzedAt).toLocaleDateString("fr-FR", {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        )}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-center gap-4">
+                        {company.seoScore != null && (
+                          <div className="flex flex-col">
+                            <span className="text-3xl font-bold">
+                              {Math.round(company.seoScore)}
+                            </span>
+                            <span className="text-xs text-muted-foreground">/ 100</span>
+                          </div>
+                        )}
+                        {company.seoScoreMobile != null && company.seoScoreDesktop != null && (
+                          <div className="flex gap-4 text-sm text-muted-foreground">
+                            <span>Mobile: {Math.round(company.seoScoreMobile)}</span>
+                            <span>Desktop: {Math.round(company.seoScoreDesktop)}</span>
+                          </div>
+                        )}
+                      </div>
+                      {company.seoData?.audits && Object.keys(company.seoData.audits).length > 0 && (
+                        <div className="space-y-2">
+                          <span className="text-sm font-medium text-muted-foreground">
+                            Audits principaux
+                          </span>
+                          <ul className="space-y-1 text-sm">
+                            {Object.entries(company.seoData.audits).map(([id, audit]) => (
+                              <li
+                                key={id}
+                                className="flex items-center justify-between gap-2"
+                              >
+                                <span>{audit.title || id}</span>
+                                <Badge
+                                  variant={audit.score === 1 ? "default" : "secondary"}
+                                  className="text-xs"
+                                >
+                                  {audit.score === 1 ? "OK" : `${Math.round((audit.score ?? 0) * 100)}%`}
+                                </Badge>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      <Button variant="outline" size="sm" asChild>
+                        <Link
+                          href={`/enrichment/seo?companyId=${company.id}`}
+                          className="gap-1"
+                        >
+                          <Search className="h-3 w-3" />
+                          Réanalyser
+                        </Link>
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : company.website ? (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Search className="h-5 w-5" />
+                        Score SEO
+                      </CardTitle>
+                      <CardDescription>
+                        Analysez le SEO du site web via Google PageSpeed Insights
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Button variant="outline" size="sm" asChild>
+                        <Link
+                          href={`/enrichment/seo?companyId=${company.id}`}
+                          className="gap-1"
+                        >
+                          <Search className="h-3 w-3" />
+                          Analyser le SEO
+                        </Link>
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : null}
+
                 {/* Métadonnées */}
                 <Card>
                   <CardHeader>
@@ -521,10 +769,201 @@ export default function CompanyDetailPage() {
                 <LeadsCardView leads={leads} />
               )}
             </TabsContent>
+
+            <TabsContent value="trustpilot" className="mt-4">
+              {loadingTrustpilot ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-3">
+                      {trustpilotStats.count > 0 && (
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            {[...Array(5)].map((_, i) => (
+                              <Star
+                                key={i}
+                                className={`h-5 w-5 ${
+                                  i < Math.round(trustpilotStats.averageRating)
+                                    ? "fill-yellow-400 text-yellow-400"
+                                    : "text-muted-foreground/30"
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <span className="text-sm font-medium">
+                            {(Number(trustpilotStats.averageRating) || 0).toFixed(1)}/5
+                          </span>
+                          <span className="text-sm text-muted-foreground">
+                            ({trustpilotStats.count} avis)
+                          </span>
+                        </div>
+                      )}
+                      {trustpilotStats.count === 0 && (
+                        <p className="text-sm text-muted-foreground">
+                          Aucun avis pour le moment
+                        </p>
+                      )}
+                    </div>
+                    {(company.domain?.trim() || company.website?.trim()) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleScrapeTrustpilot}
+                        disabled={scrapingTrustpilot}
+                      >
+                        {scrapingTrustpilot ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Scraping...
+                          </>
+                        ) : (
+                          <>
+                            <Star className="mr-2 h-4 w-4" />
+                            Scraper les avis
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                  {!(company.domain?.trim() || company.website?.trim()) && (
+                    <Card>
+                      <CardContent className="py-6">
+                        <p className="text-sm text-muted-foreground">
+                          Cette entreprise n&apos;a pas de domaine (website).
+                          Ajoutez un website ou un domaine pour pouvoir scraper
+                          les avis Trustpilot.
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-4"
+                          onClick={() => setEditSheetOpen(true)}
+                        >
+                          Modifier l&apos;entreprise
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )}
+                  {trustpilotReviews.length === 0 &&
+                    (company.domain?.trim() || company.website?.trim()) && (
+                      <Card>
+                        <CardContent className="py-12 text-center">
+                          <Star className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                          <p className="text-muted-foreground mb-4">
+                            Aucun avis Trustpilot pour cette entreprise.
+                          </p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleScrapeTrustpilot}
+                            disabled={scrapingTrustpilot}
+                          >
+                            {scrapingTrustpilot ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Scraping...
+                              </>
+                            ) : (
+                              <>
+                                <Star className="mr-2 h-4 w-4" />
+                                Scraper les avis
+                              </>
+                            )}
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    )}
+                  {trustpilotReviews.length > 0 && (
+                    <div className="space-y-4">
+                      <p className="text-sm font-medium text-muted-foreground">
+                        {trustpilotReviews.length === 1
+                          ? "Dernier avis"
+                          : trustpilotReviews.length <= 3
+                            ? `Derniers avis (${trustpilotReviews.length} sur ${trustpilotStats.count})`
+                            : `Avis affichés (${trustpilotReviews.length} sur ${trustpilotStats.count})`}
+                      </p>
+                      {trustpilotReviews.map((review) => (
+                        <Card key={review.id}>
+                          <CardContent className="pt-6">
+                            <div className="flex items-start gap-3">
+                              <div className="flex items-center gap-1 shrink-0">
+                                {[...Array(5)].map((_, i) => (
+                                  <Star
+                                    key={i}
+                                    className={`h-4 w-4 ${
+                                      i < review.rating
+                                        ? "fill-yellow-400 text-yellow-400"
+                                        : "text-muted-foreground/30"
+                                    }`}
+                                  />
+                                ))}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                {review.title && (
+                                  <p className="font-medium mb-1">{review.title}</p>
+                                )}
+                                {review.body && (
+                                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                                    {review.body}
+                                  </p>
+                                )}
+                                {review.publishedDate && (
+                                  <p className="text-xs text-muted-foreground mt-2">
+                                    {new Date(
+                                      review.publishedDate
+                                    ).toLocaleDateString("fr-FR", {
+                                      year: "numeric",
+                                      month: "long",
+                                      day: "numeric",
+                                    })}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                      {hasMoreTrustpilot && (
+                        <div className="flex justify-center pt-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={loadMoreTrustpilot}
+                            disabled={loadingMoreTrustpilot}
+                          >
+                            {loadingMoreTrustpilot ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Chargement...
+                              </>
+                            ) : (
+                              `Voir plus (${trustpilotStats.count - trustpilotReviews.length} restants)`
+                            )}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </TabsContent>
           </Tabs>
         </div>
       </SidebarInset>
       </SidebarProvider>
+
+      {/* Sheet pour modifier l'entreprise */}
+      {company && (
+        <EditCompanySheet
+          company={company}
+          open={editSheetOpen}
+          onOpenChange={setEditSheetOpen}
+          onSuccess={fetchCompany}
+        />
+      )}
 
       {/* Dialog pour scraper les employés */}
       {company && scraperId && (

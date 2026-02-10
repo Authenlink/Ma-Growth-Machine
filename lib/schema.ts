@@ -6,6 +6,8 @@ import {
   integer,
   jsonb,
   boolean,
+  real,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 // ============================================================
@@ -126,18 +128,53 @@ export const companies = pgTable("companies", {
   country: text("country"),
   employeesScraped: boolean("employees_scraped").default(false).notNull(),
   employeesScrapedAt: timestamp("employees_scraped_at"),
+
+  // SEO (Google PageSpeed Insights)
+  seoScore: real("seo_score"),
+  seoScoreMobile: real("seo_score_mobile"),
+  seoScoreDesktop: real("seo_score_desktop"),
+  seoData: jsonb("seo_data").$type<{
+    score?: number;
+    strategy?: string;
+    audits?: Record<
+      string,
+      { score?: number; title?: string }
+    >;
+  }>(),
+  seoAnalyzedAt: timestamp("seo_analyzed_at"),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+// ============================================================
+// TABLE LEAD_COLLECTIONS - Liaison many-to-many entre leads et collections
+// ============================================================
+export const leadCollections = pgTable("lead_collections", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id")
+    .notNull()
+    .references(() => leads.id, { onDelete: "cascade" }),
+  collectionId: integer("collection_id")
+    .notNull()
+    .references(() => collections.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("lead_collections_lead_collection_idx").on(
+    table.leadId,
+    table.collectionId
+  ),
+]);
 
 // ============================================================
 // TABLE LEADS - Leads de prospection
 // ============================================================
 export const leads = pgTable("leads", {
   id: serial("id").primaryKey(),
-  collectionId: integer("collection_id")
-    .notNull()
-    .references(() => collections.id, { onDelete: "cascade" }),
+  // collectionId gardé temporairement pour compatibilité - sera supprimé après migration
+  collectionId: integer("collection_id").references(() => collections.id, {
+    onDelete: "set null",
+  }),
   userId: integer("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
@@ -274,3 +311,29 @@ export const leadPosts = pgTable("lead_posts", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+// ============================================================
+// TABLE TRUSTPILOT_REVIEWS - Avis Trustpilot des entreprises
+// ============================================================
+export const trustpilotReviews = pgTable(
+  "trustpilot_reviews",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    trustpilotId: text("trustpilot_id").notNull(),
+    rating: integer("rating").notNull(),
+    publishedDate: timestamp("published_date"),
+    title: text("title"),
+    body: text("body"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("trustpilot_reviews_company_trustpilot_idx").on(
+      table.companyId,
+      table.trustpilotId
+    ),
+  ]
+);

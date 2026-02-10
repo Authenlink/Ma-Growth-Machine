@@ -1,7 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { companies } from "@/lib/schema";
+import { extractDomain } from "@/lib/bulk-email-finder-mapper";
 import { and, or, like, desc, sql, eq } from "drizzle-orm";
+
+function normalizeWebsite(input?: string | null): string | null {
+  if (!input || input.trim() === "") return null;
+  const cleaned = input.trim();
+  if (cleaned.startsWith("http://") || cleaned.startsWith("https://")) {
+    return cleaned;
+  }
+  return `https://${cleaned}`;
+}
 
 // GET /api/companies - Liste toutes les entreprises avec filtres
 export async function GET(request: NextRequest) {
@@ -95,6 +106,91 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Erreur lors de la récupération des entreprises:", error);
+    return NextResponse.json(
+      { error: "Erreur interne du serveur" },
+      { status: 500 }
+    );
+  }
+}
+
+// POST /api/companies - Créer une entreprise
+export async function POST(request: NextRequest) {
+  try {
+    const session = await auth();
+
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "Non authentifié" },
+        { status: 401 }
+      );
+    }
+
+    const body = await request.json();
+    const {
+      name,
+      website,
+      domain,
+      linkedinUrl,
+      foundedYear,
+      industry,
+      size,
+      description,
+      specialities,
+      city,
+      state,
+      country,
+    } = body;
+
+    if (!name || typeof name !== "string" || name.trim() === "") {
+      return NextResponse.json(
+        { error: "Le nom de l'entreprise est obligatoire" },
+        { status: 400 }
+      );
+    }
+
+    // Normaliser le website (ajouter https:// si absent)
+    const normalizedWebsite = normalizeWebsite(website);
+
+    // Extraire le domaine : priorité domaine explicite, sinon depuis website
+    let normalizedDomain = domain?.trim() ? extractDomain(domain) : null;
+    if (!normalizedDomain && normalizedWebsite) {
+      normalizedDomain = extractDomain(normalizedWebsite);
+    }
+
+    const insertData = {
+      name: name.trim(),
+      website: normalizedWebsite || null,
+      domain: normalizedDomain || null,
+      linkedinUrl: linkedinUrl?.trim() || null,
+      foundedYear:
+        foundedYear === null || foundedYear === ""
+          ? null
+          : parseInt(String(foundedYear), 10) || null,
+      industry: industry?.trim() || null,
+      size: size?.trim() || null,
+      description: description?.trim() || null,
+      specialities: (() => {
+        let arr: string[] = [];
+        if (Array.isArray(specialities)) {
+          arr = specialities.filter((s) => s && typeof s === "string");
+        } else if (typeof specialities === "string" && specialities.trim()) {
+          arr = specialities.split(",").map((s) => s.trim()).filter(Boolean);
+        }
+        return arr.length > 0 ? arr : null;
+      })(),
+      city: city?.trim() || null,
+      state: state?.trim() || null,
+      country: country?.trim() || null,
+    };
+
+    const [created] = await db
+      .insert(companies)
+      .values(insertData)
+      .returning();
+
+    return NextResponse.json({ success: true, company: created });
+  } catch (error) {
+    console.error("Erreur lors de la création de l'entreprise:", error);
     return NextResponse.json(
       { error: "Erreur interne du serveur" },
       { status: 500 }

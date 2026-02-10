@@ -12,6 +12,16 @@ import {
   Plus,
   Users,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
   Breadcrumb,
@@ -36,6 +46,7 @@ import { LeadsCardView } from "@/components/leads/leads-card-view";
 import { LeadsTableView } from "@/components/leads/leads-table-view";
 import { Pagination, PaginationInfo } from "@/components/ui/pagination";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { toast } from "sonner";
 
 interface Collection {
   id: number;
@@ -67,10 +78,14 @@ interface Lead {
     industry: string | null;
     size: string | null;
   } | null;
+  collections: {
+    id: number;
+    name: string;
+  }[];
   collection: {
     id: number;
     name: string;
-  };
+  } | null;
   createdAt: Date;
 }
 
@@ -117,6 +132,9 @@ export default function CollectionDetailPage({ params }: Props) {
     status?: string;
     validated?: string;
   }>({});
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [leadToDelete, setLeadToDelete] = useState<number | null>(null);
+  const [deletingLead, setDeletingLead] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -213,6 +231,38 @@ export default function CollectionDetailPage({ params }: Props) {
 
   const handlePageChange = (page: number) => {
     fetchCollectionData(page);
+  };
+
+  const handleDeleteLead = (leadId: number) => {
+    setLeadToDelete(leadId);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteLead = async () => {
+    if (!leadToDelete) return;
+
+    setDeletingLead(true);
+    try {
+      const response = await fetch(`/api/leads/${leadToDelete}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        toast.success("Lead supprimé avec succès");
+        // Rafraîchir les données
+        fetchCollectionData(currentPage);
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Erreur lors de la suppression du lead");
+      }
+    } catch (error) {
+      console.error("Erreur lors de la suppression:", error);
+      toast.error("Erreur lors de la suppression du lead");
+    } finally {
+      setDeletingLead(false);
+      setDeleteDialogOpen(false);
+      setLeadToDelete(null);
+    }
   };
 
   // Skeleton pendant le chargement
@@ -368,7 +418,9 @@ export default function CollectionDetailPage({ params }: Props) {
                 <h2 className="text-xl font-semibold">Leads</h2>
                 <p className="text-muted-foreground">
                   {collectionData.leads.pagination.totalItems} lead
-                  {collectionData.leads.pagination.totalItems !== 1 ? "s" : ""}{" "}
+                  {collectionData.leads.pagination.totalItems !== 1
+                    ? "s"
+                    : ""}{" "}
                   dans cette collection
                 </p>
               </div>
@@ -410,9 +462,15 @@ export default function CollectionDetailPage({ params }: Props) {
                 ) : (
                   <>
                     {viewMode === "cards" ? (
-                      <LeadsCardView leads={filteredLeads} />
+                      <LeadsCardView
+                        leads={filteredLeads}
+                        onDeleteLead={handleDeleteLead}
+                      />
                     ) : (
-                      <LeadsTableView leads={filteredLeads} />
+                      <LeadsTableView
+                        leads={filteredLeads}
+                        onDeleteLead={handleDeleteLead}
+                      />
                     )}
 
                     {/* Pagination */}
@@ -441,6 +499,32 @@ export default function CollectionDetailPage({ params }: Props) {
             )}
           </div>
         </div>
+
+        {/* Dialog de confirmation de suppression */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+              <AlertDialogDescription>
+                Êtes-vous sûr de vouloir supprimer ce lead ? Cette action est
+                irréversible et supprimera également tous les posts LinkedIn
+                associés à ce lead.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deletingLead}>
+                Annuler
+              </AlertDialogCancel>
+              <AlertDialogAction
+                variant="destructive"
+                onClick={confirmDeleteLead}
+                disabled={deletingLead}
+              >
+                {deletingLead ? "Suppression..." : "Supprimer"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </SidebarInset>
     </SidebarProvider>
   );

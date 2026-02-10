@@ -57,10 +57,14 @@ interface Lead {
     industry: string | null;
     size: string | null;
   } | null;
+  collections: {
+    id: number;
+    name: string;
+  }[];
   collection: {
     id: number;
     name: string;
-  };
+  } | null;
   createdAt: Date;
 }
 

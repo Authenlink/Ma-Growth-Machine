@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { collections, leads, companies, scrapers } from "@/lib/schema";
+import { collections, leads, companies, scrapers, leadCollections } from "@/lib/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { getAdapter } from "@/lib/scrapers/adapter-factory";
 import { extractDomain } from "@/lib/bulk-email-finder-mapper";
@@ -98,7 +98,7 @@ export async function POST(
       );
     }
 
-    // Récupérer tous les leads de la collection sans email avec leurs entreprises
+    // Récupérer tous les leads de la collection sans email (via lead_collections)
     const collectionLeads = await db
       .select({
         id: leads.id,
@@ -113,8 +113,12 @@ export async function POST(
         },
       })
       .from(leads)
+      .innerJoin(leadCollections, and(
+        eq(leadCollections.leadId, leads.id),
+        eq(leadCollections.collectionId, collectionId)
+      ))
       .leftJoin(companies, eq(leads.companyId, companies.id))
-      .where(and(eq(leads.collectionId, collectionId), isNull(leads.email)));
+      .where(and(eq(leads.userId, userId), isNull(leads.email)));
 
     console.log(
       `[Enrichment Emails Collection] User ${userId} enrichit collection ${collectionId} avec ${collectionLeads.length} leads sans email`

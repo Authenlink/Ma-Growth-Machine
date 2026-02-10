@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { collections, leads, companies } from "@/lib/schema";
-import { eq } from "drizzle-orm";
+import { collections, leads, companies, leadCollections } from "@/lib/schema";
+import { eq, and } from "drizzle-orm";
 import * as Papa from "papaparse";
 
 // GET /api/collections/[id]/export - Exporte tous les leads d'une collection en CSV
@@ -51,7 +51,7 @@ export async function GET(
       );
     }
 
-    // Récupérer tous les leads de la collection avec les informations complètes
+    // Récupérer tous les leads de la collection via lead_collections
     const collectionLeads = await db
       .select({
         // Informations personnelles
@@ -97,9 +97,13 @@ export async function GET(
         updatedAt: leads.updatedAt,
       })
       .from(leads)
+      .innerJoin(leadCollections, and(
+        eq(leadCollections.leadId, leads.id),
+        eq(leadCollections.collectionId, collectionId),
+      ))
       .leftJoin(companies, eq(leads.companyId, companies.id))
-      .innerJoin(collections, eq(leads.collectionId, collections.id))
-      .where(eq(leads.collectionId, collectionId))
+      .leftJoin(collections, eq(leadCollections.collectionId, collections.id))
+      .where(eq(leads.userId, parseInt(session.user.id)))
       .orderBy(leads.createdAt);
 
     // Transformer les données en format plat pour le CSV

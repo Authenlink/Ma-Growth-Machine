@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { leads, companies, collections } from "@/lib/schema";
+import { leads, companies, collections, leadCollections } from "@/lib/schema";
 import { eq, and, desc } from "drizzle-orm";
 
 // GET /api/companies/[id]/leads - Récupère tous les leads d'une entreprise pour l'utilisateur connecté
@@ -45,7 +45,7 @@ export async function GET(
     }
 
     // Récupérer tous les leads de l'entreprise pour l'utilisateur connecté
-    const results = await db
+    const leadResults = await db
       .select({
         id: leads.id,
         fullName: leads.fullName,
@@ -69,18 +69,66 @@ export async function GET(
           industry: companies.industry,
           size: companies.size,
         },
-        collection: {
-          id: collections.id,
-          name: collections.name,
-        },
       })
       .from(leads)
       .leftJoin(companies, eq(leads.companyId, companies.id))
-      .leftJoin(collections, eq(leads.collectionId, collections.id))
       .where(and(eq(leads.companyId, companyId), eq(leads.userId, userId)))
       .orderBy(desc(leads.createdAt));
 
-    return NextResponse.json(results);
+    // Récupérer les collections pour chaque lead
+    const resultsWithCollections = await Promise.all(
+      leadResults.map(async (lead) => {
+        let collectionsData: { id: number; name: string }[] = [];
+
+        try {
+          // Essayer la nouvelle table leadCollections
+          const leadCollectionsResult = await db
+            .select({
+              id: collections.id,
+              name: collections.name,
+            })
+            .from(leadCollections)
+            .innerJoin(collections, eq(leadCollections.collectionId, collections.id))
+            .where(and(eq(leadCollections.leadId, lead.id), eq(collections.userId, userId)));
+
+          collectionsData = leadCollectionsResult;
+        } catch (error) {
+          // Fallback vers l'ancien système
+          console.log("Table leadCollections non trouvée, utilisation de l'ancien système");
+          try {
+            const leadWithCollection = await db
+              .select({ collectionId: leads.collectionId })
+              .from(leads)
+              .where(eq(leads.id, lead.id))
+              .limit(1);
+
+            if (leadWithCollection.length > 0 && leadWithCollection[0].collectionId) {
+              const oldCollectionResult = await db
+                .select({
+                  id: collections.id,
+                  name: collections.name,
+                })
+                .from(collections)
+                .where(eq(collections.id, leadWithCollection[0].collectionId));
+
+              collectionsData = oldCollectionResult;
+            }
+          } catch (fallbackError) {
+            console.error("Erreur lors de la récupération des collections:", fallbackError);
+            collectionsData = [];
+          }
+        }
+
+        return {
+          ...lead,
+          collections: collectionsData,
+          // Garder la compatibilité avec l'ancien format (première collection)
+          collection: collectionsData.length > 0 ? collectionsData[0] : null,
+        };
+      })
+    );
+
+    return NextResponse.json(resultsWithCollections);
   } catch (error) {
     console.error("Erreur lors de la récupération des leads de l'entreprise:", error);
     return NextResponse.json(

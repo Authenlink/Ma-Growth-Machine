@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { collections, leads, companies } from "@/lib/schema";
-import { eq, and, isNull } from "drizzle-orm";
+import { collections, leads, companies, leadCollections } from "@/lib/schema";
+import { eq, and } from "drizzle-orm";
 
 /**
  * GET /api/collections/[id]/leads - Récupère les leads d'une collection
@@ -51,7 +51,7 @@ export async function GET(
       );
     }
 
-    // Récupérer les leads de la collection avec les informations des entreprises
+    // Récupérer les leads de la collection via lead_collections
     const collectionLeads = await db
       .select({
         id: leads.id,
@@ -68,8 +68,12 @@ export async function GET(
         },
       })
       .from(leads)
+      .innerJoin(leadCollections, and(
+        eq(leadCollections.leadId, leads.id),
+        eq(leadCollections.collectionId, collectionId)
+      ))
       .leftJoin(companies, eq(leads.companyId, companies.id))
-      .where(eq(leads.collectionId, collectionId))
+      .where(eq(leads.userId, userId))
       .orderBy(leads.createdAt);
 
     return NextResponse.json({

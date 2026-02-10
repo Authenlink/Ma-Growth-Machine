@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { leads, companies } from "./schema";
+import { leads, companies, leadCollections } from "./schema";
 import { eq, and, or } from "drizzle-orm";
 
 /**
@@ -212,22 +212,25 @@ export async function mapBulkEmailFinderDataToLeads(
       // Trouver ou créer la company à partir du domaine
       const companyId = await getOrCreateCompanyByDomain(data.domain);
 
-      // Chercher un lead existant par :
+      // Chercher un lead existant dans cette collection par :
       // 1. Email (si déjà présent)
       // 2. firstName + lastName + companyId (si disponible)
-      // 3. firstName + lastName + domain (via company website)
-      const conditions = [eq(leads.collectionId, collectionId)];
+      const collectionCondition = and(
+        eq(leadCollections.leadId, leads.id),
+        eq(leadCollections.collectionId, collectionId)
+      );
 
       // Chercher par email d'abord
       const existingByEmail = await db
-        .select()
+        .select({ lead: leads })
         .from(leads)
-        .where(and(...conditions, eq(leads.email, data.email)))
+        .innerJoin(leadCollections, collectionCondition)
+        .where(and(eq(leads.userId, userId), eq(leads.email, data.email)))
         .limit(1);
 
       if (existingByEmail.length > 0) {
         // Enrichir le lead existant
-        await enrichLeadWithEmail(existingByEmail[0], data, companyId);
+        await enrichLeadWithEmail(existingByEmail[0].lead, data, companyId);
         enriched++;
         continue;
       }
@@ -235,7 +238,7 @@ export async function mapBulkEmailFinderDataToLeads(
       // Chercher par nom + company
       if (data.firstName && data.lastName) {
         const nameConditions = [
-          ...conditions,
+          eq(leads.userId, userId),
           eq(leads.firstName, data.firstName),
           eq(leads.lastName, data.lastName),
         ];
@@ -245,27 +248,27 @@ export async function mapBulkEmailFinderDataToLeads(
         }
 
         const existingByName = await db
-          .select()
+          .select({ lead: leads })
           .from(leads)
+          .innerJoin(leadCollections, collectionCondition)
           .where(and(...nameConditions))
           .limit(1);
 
         if (existingByName.length > 0) {
           // Enrichir le lead existant
-          await enrichLeadWithEmail(existingByName[0], data, companyId);
+          await enrichLeadWithEmail(existingByName[0].lead, data, companyId);
           enriched++;
           continue;
         }
       }
 
-      // Créer un nouveau lead
+      // Créer un nouveau lead (lié via lead_collections)
       const fullName =
         data.firstName && data.lastName
           ? `${data.firstName} ${data.lastName}`
           : null;
 
-      await db.insert(leads).values({
-        collectionId,
+      const [insertedLead] = await db.insert(leads).values({
         userId,
         companyId: companyId || null,
         firstName: data.firstName || null,
@@ -273,7 +276,14 @@ export async function mapBulkEmailFinderDataToLeads(
         fullName: fullName,
         email: data.email,
         emailCertainty: data.certainty || null,
-      });
+      }).returning();
+
+      if (insertedLead) {
+        await db.insert(leadCollections).values({
+          leadId: insertedLead.id,
+          collectionId,
+        });
+      }
 
       created++;
     } catch (error) {

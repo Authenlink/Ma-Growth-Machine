@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { collections, scrapers, companies, leads } from "@/lib/schema";
-import { eq, and, or, like, sql, inArray } from "drizzle-orm";
+import { collections, scrapers, companies, leads, leadCollections } from "@/lib/schema";
+import { eq, and, inArray } from "drizzle-orm";
 import { getAdapter } from "@/lib/scrapers/adapter-factory";
 
 // Timeout maximum pour un run (30 minutes)
@@ -21,28 +21,33 @@ export async function POST(request: NextRequest) {
     const session = await auth();
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: "Non authentifié" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
     const userId = parseInt(session.user.id);
     const body = await request.json();
-    const { scraperId, collectionId, companyId, companyLinkedinUrl: directLinkedinUrl, people, selectedLeads, ...scrapingParams } = body;
+    const {
+      scraperId,
+      collectionId,
+      companyId,
+      companyLinkedinUrl: directLinkedinUrl,
+      people,
+      selectedLeads,
+      ...scrapingParams
+    } = body;
 
     // Validation des paramètres
     if (!scraperId || typeof scraperId !== "number") {
       return NextResponse.json(
         { error: "scraperId est requis et doit être un nombre" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!collectionId || typeof collectionId !== "number") {
       return NextResponse.json(
         { error: "collectionId est requis et doit être un nombre" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -51,17 +56,14 @@ export async function POST(request: NextRequest) {
       .select()
       .from(collections)
       .where(
-        and(
-          eq(collections.id, collectionId),
-          eq(collections.userId, userId)
-        )
+        and(eq(collections.id, collectionId), eq(collections.userId, userId)),
       )
       .limit(1);
 
     if (collection.length === 0) {
       return NextResponse.json(
         { error: "Collection non trouvée ou accès non autorisé" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -69,18 +71,13 @@ export async function POST(request: NextRequest) {
     const scraper = await db
       .select()
       .from(scrapers)
-      .where(
-        and(
-          eq(scrapers.id, scraperId),
-          eq(scrapers.isActive, true)
-        )
-      )
+      .where(and(eq(scrapers.id, scraperId), eq(scrapers.isActive, true)))
       .limit(1);
 
     if (scraper.length === 0) {
       return NextResponse.json(
         { error: "Scraper non trouvé ou inactif" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -89,25 +86,32 @@ export async function POST(request: NextRequest) {
     // Créer l'adapter approprié
     const adapter = getAdapter(
       scraperConfig.mapperType,
-      (scraperConfig.providerConfig || {}) as Record<string, unknown>
+      (scraperConfig.providerConfig || {}) as Record<string, unknown>,
     );
 
     // Déterminer l'URL LinkedIn de l'entreprise
     // Priorité : 1) URL directe fournie, 2) companyId fourni
     let companyLinkedinUrl: string | undefined = undefined;
-    
+
     // Si une URL LinkedIn est fournie directement, l'utiliser en priorité
-    if (directLinkedinUrl && typeof directLinkedinUrl === "string" && directLinkedinUrl.trim() !== "") {
+    if (
+      directLinkedinUrl &&
+      typeof directLinkedinUrl === "string" &&
+      directLinkedinUrl.trim() !== ""
+    ) {
       companyLinkedinUrl = directLinkedinUrl.trim();
       // Valider le format de l'URL LinkedIn
       if (!companyLinkedinUrl.includes("linkedin.com/company/")) {
         return NextResponse.json(
-          { error: "L'URL LinkedIn fournie n'est pas valide. Elle doit contenir 'linkedin.com/company/'" },
-          { status: 400 }
+          {
+            error:
+              "L'URL LinkedIn fournie n'est pas valide. Elle doit contenir 'linkedin.com/company/'",
+          },
+          { status: 400 },
         );
       }
       scrapingParams.companyLinkedinUrl = companyLinkedinUrl;
-    } 
+    }
     // Sinon, si companyId est fourni, récupérer l'entreprise et extraire linkedinUrl
     else if (companyId && typeof companyId === "number") {
       const company = await db
@@ -119,43 +123,59 @@ export async function POST(request: NextRequest) {
       if (company.length === 0) {
         return NextResponse.json(
           { error: "Entreprise non trouvée" },
-          { status: 404 }
+          { status: 404 },
         );
       }
 
       if (!company[0].linkedinUrl) {
         return NextResponse.json(
           { error: "L'entreprise sélectionnée n'a pas d'URL LinkedIn" },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
       companyLinkedinUrl = company[0].linkedinUrl;
       scrapingParams.companyLinkedinUrl = companyLinkedinUrl;
     }
-    
+
     // Vérifier qu'au moins une méthode a été fournie pour le scraper linkedin-company-employees
-    if (scraperConfig.mapperType === "linkedin-company-employees" && !companyLinkedinUrl) {
+    if (
+      scraperConfig.mapperType === "linkedin-company-employees" &&
+      !companyLinkedinUrl
+    ) {
       return NextResponse.json(
-        { error: "Vous devez soit sélectionner une entreprise, soit fournir une URL LinkedIn d'entreprise" },
-        { status: 400 }
+        {
+          error:
+            "Vous devez soit sélectionner une entreprise, soit fournir une URL LinkedIn d'entreprise",
+        },
+        { status: 400 },
       );
     }
 
     console.log(
-      `[Scraping] User ${userId} lance un scraping avec scraper ${scraperId} (${scraperConfig.name}) pour collection ${collectionId}`
+      `[Scraping] User ${userId} lance un scraping avec scraper ${scraperId} (${scraperConfig.name}) pour collection ${collectionId}`,
     );
 
     // Pour bulk-email-finder, préparer les personnes à rechercher
     if (scraperConfig.mapperType === "bulk-email-finder") {
       const peopleArray: string[] = [];
-      const leadsWithoutDomain: Array<{ id: number; name: string; companyName: string | null }> = [];
+      const leadsWithoutDomain: Array<{
+        id: number;
+        name: string;
+        companyName: string | null;
+      }> = [];
 
       // 1. Ajouter les leads sélectionnés s'ils existent
-      if (selectedLeads && Array.isArray(selectedLeads) && selectedLeads.length > 0) {
+      if (
+        selectedLeads &&
+        Array.isArray(selectedLeads) &&
+        selectedLeads.length > 0
+      ) {
         // Récupérer les leads sélectionnés avec leurs entreprises
-        const leadIds = selectedLeads.map((id) => parseInt(id.toString())).filter((id) => !isNaN(id));
-        
+        const leadIds = selectedLeads
+          .map((id) => parseInt(id.toString()))
+          .filter((id) => !isNaN(id));
+
         if (leadIds.length > 0) {
           const leadsToProcess = await db
             .select({
@@ -170,14 +190,12 @@ export async function POST(request: NextRequest) {
               },
             })
             .from(leads)
+            .innerJoin(leadCollections, and(
+              eq(leadCollections.leadId, leads.id),
+              eq(leadCollections.collectionId, collectionId),
+            ))
             .leftJoin(companies, eq(leads.companyId, companies.id))
-            .where(
-              and(
-                inArray(leads.id, leadIds),
-                eq(leads.collectionId, collectionId),
-                eq(leads.userId, userId)
-              )
-            );
+            .where(and(inArray(leads.id, leadIds), eq(leads.userId, userId)));
 
           // Transformer chaque lead en format "Prénom, Nom, Domaine"
           for (const lead of leadsToProcess) {
@@ -198,19 +216,22 @@ export async function POST(request: NextRequest) {
                 const url = new URL(lead.company.website);
                 domain = url.hostname.replace(/^www\./, "");
               } catch {
-                domain = lead.company.website.replace(/^www\./, "").split("/")[0];
+                domain = lead.company.website
+                  .replace(/^www\./, "")
+                  .split("/")[0];
               }
             }
 
             if (!domain) {
-              const leadName = lead.fullName || `${lead.firstName} ${lead.lastName}`;
+              const leadName =
+                lead.fullName || `${lead.firstName} ${lead.lastName}`;
               leadsWithoutDomain.push({
                 id: lead.id,
                 name: leadName,
                 companyName: lead.company?.name || null,
               });
               console.log(
-                `[Scraping] Lead ${lead.id} (${leadName}) ignoré : pas de domaine disponible${lead.company?.name ? ` (entreprise: ${lead.company.name})` : " (pas d'entreprise associée)"}`
+                `[Scraping] Lead ${lead.id} (${leadName}) ignoré : pas de domaine disponible${lead.company?.name ? ` (entreprise: ${lead.company.name})` : " (pas d'entreprise associée)"}`,
               );
               continue;
             }
@@ -237,7 +258,7 @@ export async function POST(request: NextRequest) {
       // Vérifier qu'on a au moins une personne
       if (peopleArray.length === 0) {
         let errorMessage = "Aucune personne valide à rechercher. ";
-        
+
         if (leadsWithoutDomain.length > 0) {
           errorMessage += `Les leads suivants n'ont pas de domaine disponible (entreprise sans website ou pas d'entreprise associée) :\n`;
           leadsWithoutDomain.forEach((lead) => {
@@ -245,32 +266,38 @@ export async function POST(request: NextRequest) {
           });
           errorMessage += "\nVous pouvez soit :\n";
           errorMessage += "1. Ajouter un website à l'entreprise de ces leads\n";
-          errorMessage += "2. Entrer manuellement ces personnes au format 'Prénom, Nom, Domaine' dans le champ texte";
+          errorMessage +=
+            "2. Entrer manuellement ces personnes au format 'Prénom, Nom, Domaine' dans le champ texte";
         } else {
-          errorMessage += "Vous devez soit sélectionner des leads, soit entrer manuellement des personnes au format 'Prénom, Nom, Domaine'";
+          errorMessage +=
+            "Vous devez soit sélectionner des leads, soit entrer manuellement des personnes au format 'Prénom, Nom, Domaine'";
         }
-        
+
         return NextResponse.json(
-          { 
+          {
             error: errorMessage,
-            leadsWithoutDomain: leadsWithoutDomain.length > 0 ? leadsWithoutDomain : undefined
+            leadsWithoutDomain:
+              leadsWithoutDomain.length > 0 ? leadsWithoutDomain : undefined,
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
-      
+
       // Avertir si certains leads n'ont pas pu être traités
       if (leadsWithoutDomain.length > 0) {
         console.log(
           `[Scraping] ${leadsWithoutDomain.length} lead(s) ignoré(s) car sans domaine :`,
-          leadsWithoutDomain.map(l => `${l.name} (ID: ${l.id})`).join(", ")
+          leadsWithoutDomain.map((l) => `${l.name} (ID: ${l.id})`).join(", "),
         );
       }
 
       scrapingParams.people = peopleArray;
     }
 
-    console.log(`[Scraping] Paramètres:`, JSON.stringify(scrapingParams, null, 2));
+    console.log(
+      `[Scraping] Paramètres:`,
+      JSON.stringify(scrapingParams, null, 2),
+    );
 
     // Exécuter le scraping
     const run = await adapter.execute(scrapingParams);
@@ -297,12 +324,14 @@ export async function POST(request: NextRequest) {
       // Log du progrès toutes les 30 secondes
       if (attempts % 6 === 0) {
         console.log(
-          `[Scraping] Run ${runId} toujours en cours: ${runStatus.status} (${attempts * POLL_INTERVAL / 1000}s)`
+          `[Scraping] Run ${runId} toujours en cours: ${runStatus.status} (${(attempts * POLL_INTERVAL) / 1000}s)`,
         );
       }
     }
 
-    console.log(`[Scraping] Run ${runId} terminé avec le statut: ${runStatus.status}`);
+    console.log(
+      `[Scraping] Run ${runId} terminé avec le statut: ${runStatus.status}`,
+    );
 
     // Vérifier le statut final
     if (runStatus.status !== "SUCCEEDED") {
@@ -310,10 +339,10 @@ export async function POST(request: NextRequest) {
         runStatus.status === "FAILED"
           ? "Le scraping a échoué"
           : runStatus.status === "TIMED-OUT"
-          ? "Le scraping a dépassé le temps limite"
-          : runStatus.status === "ABORTED"
-          ? "Le scraping a été annulé"
-          : "Le scraping s'est terminé avec une erreur";
+            ? "Le scraping a dépassé le temps limite"
+            : runStatus.status === "ABORTED"
+              ? "Le scraping a été annulé"
+              : "Le scraping s'est terminé avec une erreur";
 
       console.error(`[Scraping] Erreur pour run ${runId}:`, errorMessage);
 
@@ -323,7 +352,7 @@ export async function POST(request: NextRequest) {
           runId: run.id,
           status: runStatus.status,
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -337,7 +366,12 @@ export async function POST(request: NextRequest) {
     let mappingResult;
     const mapperType = scraperConfig.mapperType;
     if (mapperType === "linkedin-company-employees" && companyLinkedinUrl) {
-      mappingResult = await (adapter as any).mapToLeads(items, collectionId, userId, companyLinkedinUrl);
+      mappingResult = await (adapter as any).mapToLeads(
+        items,
+        collectionId,
+        userId,
+        companyLinkedinUrl,
+      );
     } else {
       mappingResult = await adapter.mapToLeads(items, collectionId, userId);
     }
@@ -348,17 +382,20 @@ export async function POST(request: NextRequest) {
     console.log(
       `[Scraping] Scraping terminé pour collection ${collectionId}:`,
       `${mappingResult.created} créés, ${mappingResult.skipped} ignorés, ${mappingResult.errors} erreurs${enrichedCount > 0 ? `, ${enrichedCount} enrichis` : ""}`,
-      `(durée: ${duration}s)`
+      `(durée: ${duration}s)`,
     );
 
     // Mettre à jour les champs employeesScraped pour le scraper linkedin-company-employees
-    if (mapperType === "linkedin-company-employees" && mappingResult.created > 0) {
+    if (
+      mapperType === "linkedin-company-employees" &&
+      mappingResult.created > 0
+    ) {
       let companyToUpdate: number | null = null;
-      
+
       // Si companyId est fourni, l'utiliser directement
       if (companyId && typeof companyId === "number") {
         companyToUpdate = companyId;
-      } 
+      }
       // Sinon, chercher l'entreprise par linkedinUrl
       else if (companyLinkedinUrl) {
         const companyResult = await db
@@ -366,7 +403,7 @@ export async function POST(request: NextRequest) {
           .from(companies)
           .where(eq(companies.linkedinUrl, companyLinkedinUrl))
           .limit(1);
-        
+
         if (companyResult.length > 0) {
           companyToUpdate = companyResult[0].id;
         }
@@ -382,8 +419,10 @@ export async function POST(request: NextRequest) {
             updatedAt: new Date(),
           })
           .where(eq(companies.id, companyToUpdate));
-        
-        console.log(`[Scraping] Entreprise ${companyToUpdate} mise à jour : employeesScraped = true`);
+
+        console.log(
+          `[Scraping] Entreprise ${companyToUpdate} mise à jour : employeesScraped = true`,
+        );
       }
     }
 
@@ -418,7 +457,7 @@ export async function POST(request: NextRequest) {
           error: "Limite de requêtes atteinte. Veuillez réessayer plus tard.",
           runId,
         },
-        { status: 429 }
+        { status: 429 },
       );
     }
 
@@ -428,7 +467,7 @@ export async function POST(request: NextRequest) {
         message: error instanceof Error ? error.message : "Erreur inconnue",
         runId,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

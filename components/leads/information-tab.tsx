@@ -12,11 +12,32 @@ import {
   CheckCircle2,
   XCircle,
   ExternalLink,
+  Plus,
+  X,
+  FolderPlus,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cleanIndustry } from "@/lib/utils";
+import { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "sonner";
 
 interface LeadDetail {
   id: number;
@@ -56,17 +77,117 @@ interface LeadDetail {
     state: string | null;
     country: string | null;
   } | null;
+  collections: {
+    id: number;
+    name: string;
+  }[];
   collection: {
     id: number;
     name: string;
-  };
+  } | null; // Pour la compatibilité
 }
 
 interface InformationTabProps {
   lead: LeadDetail;
+  onLeadUpdate?: (updatedLead: LeadDetail) => void;
 }
 
-export function InformationTab({ lead }: InformationTabProps) {
+export function InformationTab({ lead, onLeadUpdate }: InformationTabProps) {
+  const [collections, setCollections] = useState<{ id: number; name: string }[]>(lead.collections || []);
+  const [availableCollections, setAvailableCollections] = useState<{ id: number; name: string }[]>([]);
+  const [addCollectionDialogOpen, setAddCollectionDialogOpen] = useState(false);
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string>("");
+  const [loading, setLoading] = useState(false);
+
+  // Récupérer les collections disponibles
+  const fetchAvailableCollections = async () => {
+    try {
+      const response = await fetch("/api/collections");
+      if (response.ok) {
+        const allCollections = await response.json();
+        // Filtrer les collections qui ne sont pas déjà associées au lead
+        const currentCollectionIds = collections.map(c => c.id);
+        const available = allCollections.filter((c: { id: number }) => !currentCollectionIds.includes(c.id));
+        setAvailableCollections(available);
+      }
+    } catch (error) {
+      console.error("Erreur lors de la récupération des collections:", error);
+    }
+  };
+
+  // Ajouter une collection au lead
+  const addCollectionToLead = async () => {
+    if (!selectedCollectionId) return;
+
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/leads/${lead.id}/collections`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ collectionId: parseInt(selectedCollectionId) }),
+      });
+
+      if (response.ok) {
+        const addedCollection = availableCollections.find(c => c.id === parseInt(selectedCollectionId));
+        if (addedCollection) {
+          const newCollections = [...collections, addedCollection];
+          setCollections(newCollections);
+          setAvailableCollections(prev => prev.filter(c => c.id !== parseInt(selectedCollectionId)));
+          setSelectedCollectionId("");
+          setAddCollectionDialogOpen(false);
+          toast.success("Collection ajoutée au lead");
+
+          // Notifier le parent
+          if (onLeadUpdate) {
+            onLeadUpdate({ ...lead, collections: newCollections });
+          }
+        }
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Erreur lors de l'ajout de la collection");
+      }
+    } catch (error) {
+      console.error("Erreur:", error);
+      toast.error("Erreur lors de l'ajout de la collection");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Supprimer une collection du lead
+  const removeCollectionFromLead = async (collectionId: number) => {
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/leads/${lead.id}/collections/${collectionId}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        const removedCollection = collections.find(c => c.id === collectionId);
+        const newCollections = collections.filter(c => c.id !== collectionId);
+        setCollections(newCollections);
+
+        if (removedCollection) {
+          setAvailableCollections(prev => [...prev, removedCollection]);
+        }
+
+        toast.success("Collection retirée du lead");
+
+        // Notifier le parent
+        if (onLeadUpdate) {
+          onLeadUpdate({ ...lead, collections: newCollections });
+        }
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Erreur lors de la suppression de la collection");
+      }
+    } catch (error) {
+      console.error("Erreur:", error);
+      toast.error("Erreur lors de la suppression de la collection");
+    } finally {
+      setLoading(false);
+    }
+  };
   const getLocation = () => {
     const parts = [];
     if (lead.city) parts.push(lead.city);
@@ -318,23 +439,89 @@ export function InformationTab({ lead }: InformationTabProps) {
           </Card>
         )}
 
-        {/* Collection et Métadonnées */}
+        {/* Collections et Métadonnées */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Métadonnées
+              <FolderPlus className="h-5 w-5" />
+              Collections
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <span className="text-sm text-muted-foreground">
-                Collection:{" "}
-              </span>
-              <Badge variant="outline" className="text-xs">
-                {lead.collection.name}
-              </Badge>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">
+                  Collections associées ({collections.length})
+                </span>
+                <Dialog open={addCollectionDialogOpen} onOpenChange={setAddCollectionDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={fetchAvailableCollections}
+                      className="gap-1"
+                    >
+                      <Plus className="h-3 w-3" />
+                      Ajouter
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Ajouter à une collection</DialogTitle>
+                      <DialogDescription>
+                        Sélectionnez une collection pour ajouter ce lead.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                      <Select value={selectedCollectionId} onValueChange={setSelectedCollectionId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choisir une collection" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableCollections.map((collection) => (
+                            <SelectItem key={collection.id} value={collection.id.toString()}>
+                              {collection.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        onClick={addCollectionToLead}
+                        disabled={!selectedCollectionId || loading}
+                      >
+                        {loading ? "Ajout..." : "Ajouter"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              {collections.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {collections.map((collection) => (
+                    <Badge key={collection.id} variant="outline" className="text-xs gap-1 pr-1">
+                      {collection.name}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-4 w-4 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                        onClick={() => removeCollectionFromLead(collection.id)}
+                        disabled={loading}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Aucune collection associée
+                </p>
+              )}
             </div>
+
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
               <span className="text-sm text-muted-foreground">

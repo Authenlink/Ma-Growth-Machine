@@ -688,6 +688,82 @@ async function seedScrapers() {
       console.log("✅ Scraper Bulk Email Finder inséré");
     }
 
+    // Trustpilot Reviews Scraper
+    const trustpilotReviewsFormConfig = {
+      fields: [
+        {
+          id: "collectionId",
+          type: "collection" as const,
+          label: "Collection",
+          helpText: "En mode collection, sélectionnez la collection à enrichir.",
+        },
+        {
+          id: "companyId",
+          type: "company" as const,
+          label: "Entreprise",
+          helpText: "En mode entreprise unique, sélectionnez l'entreprise.",
+        },
+        {
+          id: "maxItems",
+          type: "number" as const,
+          label: "Nombre max d'avis par entreprise",
+          min: 10,
+          max: 500,
+          defaultValue: 100,
+          helpText: "Nombre maximum d'avis à récupérer (10-500)",
+        },
+      ],
+      sections: [
+        {
+          title: "Paramètres",
+          description: "Scrape les avis Trustpilot via Apify. Un domaine (website) est requis pour chaque entreprise.",
+          fields: ["collectionId", "companyId", "maxItems"],
+        },
+      ],
+    };
+
+    const existingTrustpilot = await db
+      .select()
+      .from(scrapers)
+      .where(eq(scrapers.mapperType, "trustpilot-reviews"))
+      .limit(1);
+
+    if (existingTrustpilot.length > 0) {
+      console.log("✅ Scraper Trustpilot Reviews existe déjà, mise à jour...");
+      await db
+        .update(scrapers)
+        .set({
+          name: "Trustpilot Reviews Scraper",
+          description:
+            "Scrape les avis Trustpilot des entreprises. Utilisez la page Enrichissement > Avis Trustpilot pour lancer.",
+          provider: "apify",
+          providerConfig: {
+            actorId: "thewolves/trustpilot-reviews-scraper",
+          },
+          formConfig: trustpilotReviewsFormConfig,
+          mapperType: "trustpilot-reviews",
+          isActive: true,
+          updatedAt: new Date(),
+        })
+        .where(eq(scrapers.id, existingTrustpilot[0].id));
+      console.log("✅ Scraper Trustpilot Reviews mis à jour");
+    } else {
+      console.log("➕ Insertion du scraper Trustpilot Reviews...");
+      await db.insert(scrapers).values({
+        name: "Trustpilot Reviews Scraper",
+        description:
+          "Scrape les avis Trustpilot des entreprises. Utilisez la page Enrichissement > Avis Trustpilot pour lancer.",
+        provider: "apify",
+        providerConfig: {
+          actorId: "thewolves/trustpilot-reviews-scraper",
+        },
+        formConfig: trustpilotReviewsFormConfig,
+        mapperType: "trustpilot-reviews",
+        isActive: true,
+      });
+      console.log("✅ Scraper Trustpilot Reviews inséré");
+    }
+
     console.log("🎉 Seeding terminé!");
   } catch (error) {
     console.error("❌ Erreur lors du seeding:", error);

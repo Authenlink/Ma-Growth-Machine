@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { leads, companies } from "./schema";
+import { leads, companies, leadCollections } from "./schema";
 import { eq, and, or } from "drizzle-orm";
 
 /**
@@ -326,27 +326,26 @@ export async function mapApifyDataToLeads(
 
   for (const data of apifyData) {
     try {
-      // Vérifier si le lead existe déjà (par email ou linkedinUrl)
+      // Vérifier si le lead existe déjà dans cette collection (par email ou linkedinUrl)
       if (data.email || data.linkedinUrl) {
-        const conditions = [eq(leads.collectionId, collectionId)];
-        
-        if (data.email) {
-          conditions.push(eq(leads.email, data.email));
-        }
-        if (data.linkedinUrl) {
-          conditions.push(eq(leads.linkedinUrl, data.linkedinUrl));
-        }
+        const conditions = [eq(leads.userId, userId)];
+        if (data.email) conditions.push(eq(leads.email, data.email));
+        if (data.linkedinUrl) conditions.push(eq(leads.linkedinUrl, data.linkedinUrl));
 
         const existingLead = await db
-          .select()
+          .select({ lead: leads })
           .from(leads)
+          .innerJoin(leadCollections, and(
+            eq(leadCollections.leadId, leads.id),
+            eq(leadCollections.collectionId, collectionId)
+          ))
           .where(and(...conditions))
           .limit(1);
 
         if (existingLead.length > 0) {
           // Enrichir le lead existant
           const companyId = await getOrCreateCompany(data);
-          await enrichLead(existingLead[0], data, companyId);
+          await enrichLead(existingLead[0].lead, data, companyId);
           enriched++;
           continue;
         }
@@ -375,9 +374,8 @@ export async function mapApifyDataToLeads(
         phoneNumbers = [data.phone];
       }
 
-      // Créer le lead
-      await db.insert(leads).values({
-        collectionId,
+      // Créer le lead (sans collectionId - lié via lead_collections)
+      const [insertedLead] = await db.insert(leads).values({
         userId,
         companyId: companyId || null,
         personId: null, // Pas de personId dans les données Apify
@@ -402,7 +400,15 @@ export async function mapApifyDataToLeads(
         status: data.status && data.status.trim() !== "" ? data.status : null,
         validated: data.validated !== undefined ? data.validated : false,
         reason: data.reason && data.reason.trim() !== "" ? data.reason : null,
-      });
+      }).returning();
+
+      // Associer le lead à la collection
+      if (insertedLead) {
+        await db.insert(leadCollections).values({
+          leadId: insertedLead.id,
+          collectionId,
+        });
+      }
 
       created++;
     } catch (error) {

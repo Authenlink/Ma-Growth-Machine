@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { leads, companies, collections } from "@/lib/schema";
-import { eq, and, or, like, desc, sql } from "drizzle-orm";
+import { leads, companies, collections, leadCollections } from "@/lib/schema";
+import { eq, and, or, like, desc, sql, inArray } from "drizzle-orm";
 
 // GET /api/leads - Liste tous les leads de l'utilisateur avec filtres
 export async function GET(request: NextRequest) {
@@ -37,10 +37,8 @@ export async function GET(request: NextRequest) {
     // Construire les conditions de filtrage
     const conditions = [eq(leads.userId, userId)];
 
-    // Filtre par collection
-    if (collectionId) {
-      conditions.push(eq(leads.collectionId, parseInt(collectionId)));
-    }
+    // Filtre par collection (via lead_collections) - géré via join plus bas
+    const filterCollectionId = collectionId ? parseInt(collectionId) : null;
 
     // Filtre par nom de lead (recherche dans fullName, firstName, lastName)
     if (leadName && leadName.trim() !== "") {
@@ -97,22 +95,29 @@ export async function GET(request: NextRequest) {
       ? (whereConditions.length === 1 ? whereConditions[0] : and(...whereConditions)!)
       : undefined;
 
-    // Compter le nombre total d'éléments
-    const countQuery = db
+    // Compter le nombre total d'éléments (avec filtre collection via lead_collections)
+    const countBase = db
       .select({ count: sql<number>`count(*)` })
       .from(leads)
-      .leftJoin(companies, eq(leads.companyId, companies.id))
-      .leftJoin(collections, eq(leads.collectionId, collections.id));
+      .leftJoin(companies, eq(leads.companyId, companies.id));
 
-    if (finalWhereCondition) {
-      countQuery.where(finalWhereCondition);
-    }
+    const countWithCollection = filterCollectionId
+      ? countBase.innerJoin(
+          leadCollections,
+          and(
+            eq(leadCollections.leadId, leads.id),
+            eq(leadCollections.collectionId, filterCollectionId)
+          )
+        )
+      : countBase;
 
-    const totalCountResult = await countQuery;
+    const totalCountResult = await (finalWhereCondition
+      ? countWithCollection.where(finalWhereCondition)
+      : countWithCollection);
     const totalItems = totalCountResult[0]?.count || 0;
 
-    // Requête avec joins pour récupérer les leads avec leurs entreprises et collections
-    let query = db
+    // Requête avec joins pour récupérer les leads avec leurs entreprises
+    const queryBase = db
       .select({
         id: leads.id,
         fullName: leads.fullName,
@@ -136,26 +141,63 @@ export async function GET(request: NextRequest) {
           industry: companies.industry,
           size: companies.size,
         },
-        collection: {
-          id: collections.id,
-          name: collections.name,
-        },
       })
       .from(leads)
-      .leftJoin(companies, eq(leads.companyId, companies.id))
-      .leftJoin(collections, eq(leads.collectionId, collections.id));
+      .leftJoin(companies, eq(leads.companyId, companies.id));
+
+    const queryWithCollection = filterCollectionId
+      ? queryBase.innerJoin(
+          leadCollections,
+          and(
+            eq(leadCollections.leadId, leads.id),
+            eq(leadCollections.collectionId, filterCollectionId)
+          )
+        )
+      : queryBase;
 
     // Appliquer toutes les conditions et ordonner par date de création (plus récent en premier) et appliquer la pagination
-    const results = await query
-      .where(finalWhereCondition || undefined)
+    const results = await (finalWhereCondition
+      ? queryWithCollection.where(finalWhereCondition)
+      : queryWithCollection)
       .orderBy(desc(leads.createdAt))
       .limit(limit)
       .offset(offset);
 
     const totalPages = Math.ceil(totalItems / limit);
 
+    // Récupérer les collections pour chaque lead (via lead_collections)
+    const leadIds = results.map((r) => r.id);
+    const leadCollectionsData =
+      leadIds.length > 0
+        ? await db
+            .select({
+              leadId: leadCollections.leadId,
+              id: collections.id,
+              name: collections.name,
+            })
+            .from(leadCollections)
+            .innerJoin(collections, eq(leadCollections.collectionId, collections.id))
+            .where(inArray(leadCollections.leadId, leadIds))
+        : [];
+
+    const collectionsByLead = new Map<number, { id: number; name: string }[]>();
+    for (const lc of leadCollectionsData) {
+      const list = collectionsByLead.get(lc.leadId) ?? [];
+      list.push({ id: lc.id, name: lc.name });
+      collectionsByLead.set(lc.leadId, list);
+    }
+
+    const resultsWithCollections = results.map((lead) => ({
+      ...lead,
+      collections: collectionsByLead.get(lead.id) ?? [],
+      collection: (() => {
+        const cols = collectionsByLead.get(lead.id);
+        return cols && cols.length > 0 ? cols[0] : null;
+      })(),
+    }));
+
     return NextResponse.json({
-      data: results,
+      data: resultsWithCollections,
       pagination: {
         page,
         limit,
@@ -323,11 +365,10 @@ export async function POST(request: NextRequest) {
     // Construire le nom complet
     const fullName = `${body.firstName.trim()} ${body.lastName.trim()}`;
 
-    // Créer le lead
+    // Créer le lead (sans collectionId - lié via lead_collections)
     const [newLead] = await db
       .insert(leads)
       .values({
-        collectionId,
         userId,
         companyId: companyId || null,
         firstName: body.firstName.trim(),
@@ -350,6 +391,12 @@ export async function POST(request: NextRequest) {
         reason: body.reason || null,
       })
       .returning();
+
+    // Associer le lead à la collection via lead_collections
+    await db.insert(leadCollections).values({
+      leadId: newLead.id,
+      collectionId,
+    });
 
     return NextResponse.json({
       success: true,
