@@ -84,39 +84,60 @@
 
 .light {
   --radius: 0.65rem;
-  --background: oklch(0.98 0.008 75); /* Plus neutre, moins beige */
-  --foreground: oklch(0.18 0.008 75);
-  --card: oklch(
-    0.95 0.015 75
-  ); /* Contraste subtil mais visible avec le background */
-  --card-foreground: oklch(0.18 0.008 75);
-  --popover: oklch(0.96 0.012 75);
-  --popover-foreground: oklch(0.18 0.008 75);
-  --primary: oklch(0.55 0.15 150);
-  --primary-foreground: oklch(0.98 0.01 150);
-  --secondary: oklch(0.93 0.02 75);
-  --secondary-foreground: oklch(0.25 0.01 75);
-  --muted: oklch(0.92 0.015 75);
-  --muted-foreground: oklch(0.45 0.012 75);
-  --accent: oklch(0.91 0.022 75);
-  --accent-foreground: oklch(0.25 0.01 75);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.87 0.012 75); /* Border plus subtile */
-  --input: oklch(0.87 0.012 75);
-  --ring: oklch(0.55 0.15 150);
-  --chart-1: oklch(0.55 0.15 150);
-  --chart-2: oklch(0.5 0.14 160);
-  --chart-3: oklch(0.45 0.13 170);
-  --chart-4: oklch(0.4 0.12 180);
-  --chart-5: oklch(0.35 0.11 190);
-  --sidebar: oklch(0.94 0.018 75); /* RÃ©duit la saturation */
-  --sidebar-foreground: oklch(0.18 0.008 75);
-  --sidebar-primary: oklch(0.55 0.15 150);
-  --sidebar-primary-foreground: oklch(0.98 0.01 150);
-  --sidebar-accent: oklch(0.91 0.02 75);
-  --sidebar-accent-foreground: oklch(0.25 0.01 75);
-  --sidebar-border: oklch(0.87 0.015 75);
-  --sidebar-ring: oklch(0.55 0.15 150);
+
+  /* Backgrounds - Sombre mais pas noir profond */
+  --background: oklch(0.18 0.015 220);
+  --foreground: oklch(0.95 0.008 200);
+
+  /* Cards - Légèrement plus clair que le background */
+  --card: oklch(0.22 0.018 220);
+  --card-foreground: oklch(0.95 0.008 200);
+
+  /* Popovers */
+  --popover: oklch(0.2 0.016 220);
+  --popover-foreground: oklch(0.95 0.008 200);
+
+  /* Primary - Cyan/Turquoise électrique Neon */
+  --primary: oklch(0.7 0.2 195);
+  --primary-foreground: oklch(0.15 0.015 220);
+
+  /* Secondary - Vert émeraude doux */
+  --secondary: oklch(0.28 0.025 180);
+  --secondary-foreground: oklch(0.95 0.01 180);
+
+  /* Muted */
+  --muted: oklch(0.25 0.018 220);
+  --muted-foreground: oklch(0.65 0.015 200);
+
+  /* Accent - Violet/Magenta électrique */
+  --accent: oklch(0.3 0.045 300);
+  --accent-foreground: oklch(0.95 0.01 300);
+
+  /* Destructive - Rouge/Rose vif */
+  --destructive: oklch(0.65 0.24 20);
+  --destructive-foreground: oklch(0.98 0.01 20);
+
+  /* Borders & Inputs - Subtils mais visibles */
+  --border: oklch(0.3 0.02 220);
+  --input: oklch(0.3 0.02 220);
+  --ring: oklch(0.7 0.2 195);
+
+  /* Charts - Palette Neon colorée */
+  --chart-1: oklch(0.7 0.2 195); /* Cyan électrique */
+  --chart-2: oklch(0.68 0.19 170); /* Vert-cyan */
+  --chart-3: oklch(0.66 0.18 150); /* Vert */
+  --chart-4: oklch(0.68 0.2 280); /* Violet */
+  --chart-5: oklch(0.7 0.21 310); /* Magenta */
+
+  /* Sidebar - Légèrement différent du background */
+  --sidebar: oklch(0.2 0.016 220);
+  --sidebar-foreground: oklch(0.95 0.008 200);
+  --sidebar-primary: oklch(0.7 0.2 195);
+  --sidebar-primary-foreground: oklch(0.15 0.015 220);
+  --sidebar-accent: oklch(0.3 0.045 300);
+  --sidebar-accent-foreground: oklch(0.95 0.01 300);
+  --sidebar-border: oklch(0.28 0.02 220);
+  --sidebar-ring: oklch(0.7 0.2 195);
 }
 
 .dark {
