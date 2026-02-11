@@ -1,7 +1,13 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
-import { Globe, Linkedin, ExternalLink, MapPin, Users, Calendar } from "lucide-react";
+import {
+  Globe,
+  Linkedin,
+  ExternalLink,
+  MapPin,
+  Users,
+  Calendar,
+} from "lucide-react";
 import Link from "next/link";
 import { cleanIndustry } from "@/lib/utils";
 
@@ -49,94 +55,99 @@ export function CompaniesTableView({ companies }: CompaniesTableViewProps) {
     );
   }
 
-  return (
-    <div className="rounded-md border overflow-x-auto">
-      <table className="w-full">
-        <thead>
-          <tr className="border-b bg-muted/50">
-            <th className="h-12 px-4 text-left align-middle font-medium text-sm">
-              Nom
-            </th>
-            <th className="h-12 px-4 text-left align-middle font-medium text-sm">
-              Industrie
-            </th>
-            <th className="h-12 px-4 text-left align-middle font-medium text-sm">
-              Taille
-            </th>
-            <th className="h-12 px-4 text-left align-middle font-medium text-sm">
-              Localisation
-            </th>
-            <th className="h-12 px-4 text-left align-middle font-medium text-sm">
-              Fondation
-            </th>
-            <th className="h-12 px-4 text-left align-middle font-medium text-sm">
-              Site web
-            </th>
-            <th className="h-12 px-4 text-left align-middle font-medium text-sm">
-              Actions
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {companies.map((company) => {
-            const location = getLocation(company);
-            const foundedInfo = getFoundedInfo(company);
+  const headerCellClass =
+    "h-10 px-3 text-left align-middle font-medium text-xs border-r border-border last:border-r-0 sticky top-0 bg-muted z-[2]";
+  const stickyHeaderClass = `${headerCellClass} left-0 z-[3] min-w-[200px] border-r border-border shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]`;
+  const cellClass =
+    "px-3 py-2 align-middle text-sm border-r border-border last:border-r-0";
+  const getStickyCellClass = (isEvenRow: boolean) =>
+    `${cellClass} sticky left-0 z-[1] min-w-[200px] border-r border-border shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] ${isEvenRow ? "bg-muted" : "bg-background"}`;
 
-            return (
-              <tr
-                key={company.id}
-                className="border-b transition-colors hover:bg-muted/50 cursor-pointer"
-                onClick={() => window.location.href = `/companies/${company.id}`}
-              >
-                <td className="p-4 align-middle">
-                  <Link
-                    href={`/companies/${company.id}`}
-                    onClick={(e) => e.stopPropagation()}
-                    className="font-medium hover:underline text-primary"
-                  >
-                    {company.name}
-                  </Link>
-                </td>
-                <td className="p-4 align-middle">
-                  <div className="text-sm">{cleanIndustry(company.industry) || "—"}</div>
-                </td>
-                <td className="p-4 align-middle">
-                  <div className="text-sm flex items-center gap-1">
-                    {company.size && <Users className="h-3 w-3 text-muted-foreground" />}
-                    {company.size || "—"}
-                  </div>
-                </td>
-                <td className="p-4 align-middle">
-                  <div className="text-sm flex items-center gap-1">
-                    {location !== "—" && <MapPin className="h-3 w-3 text-muted-foreground" />}
-                    {location}
-                  </div>
-                </td>
-                <td className="p-4 align-middle">
-                  <div className="text-sm flex items-center gap-1">
-                    {foundedInfo !== "—" && <Calendar className="h-3 w-3 text-muted-foreground" />}
-                    {foundedInfo}
-                  </div>
-                </td>
-                <td className="p-4 align-middle">
-                  {company.website ? (
-                    <a
-                      href={company.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
+  return (
+    <div className="rounded-md border max-w-full max-h-[calc(100vh-250px)] overflow-auto">
+      <div className="min-w-fit">
+        <table className="w-full border-collapse min-w-max">
+          <thead>
+            <tr className="border-b border-border">
+              <th className={stickyHeaderClass}>Nom</th>
+              <th className={headerCellClass}>Industrie</th>
+              <th className={headerCellClass}>Taille</th>
+              <th className={headerCellClass}>Localisation</th>
+              <th className={headerCellClass}>Fondation</th>
+              <th className={headerCellClass}>Site web</th>
+              <th className={headerCellClass}>LinkedIn</th>
+              <th className={headerCellClass}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {companies.map((company, index) => {
+              const location = getLocation(company);
+              const foundedInfo = getFoundedInfo(company);
+
+              return (
+                <tr
+                  key={company.id}
+                  className="border-b border-border transition-colors hover:bg-muted/50 cursor-pointer even:bg-muted/30"
+                  onClick={() =>
+                    (window.location.href = `/companies/${company.id}`)
+                  }
+                >
+                  <td className={getStickyCellClass(index % 2 === 1)}>
+                    <Link
+                      href={`/companies/${company.id}`}
                       onClick={(e) => e.stopPropagation()}
-                      className="text-sm text-primary hover:underline flex items-center gap-1"
+                      className="font-medium hover:underline text-primary"
                     >
-                      <Globe className="h-3 w-3" />
-                      Site web
-                    </a>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </td>
-                <td className="p-4 align-middle">
-                  <div className="flex items-center gap-2">
-                    {company.linkedinUrl && (
+                      {company.name}
+                    </Link>
+                  </td>
+                  <td className={cellClass}>
+                    <span className="text-sm">
+                      {cleanIndustry(company.industry) || "—"}
+                    </span>
+                  </td>
+                  <td className={cellClass}>
+                    <span className="text-sm flex items-center gap-1">
+                      {company.size && (
+                        <Users className="h-3 w-3 text-muted-foreground shrink-0" />
+                      )}
+                      {company.size || "—"}
+                    </span>
+                  </td>
+                  <td className={cellClass}>
+                    <span className="text-sm flex items-center gap-1">
+                      {location !== "—" && (
+                        <MapPin className="h-3 w-3 text-muted-foreground shrink-0" />
+                      )}
+                      {location}
+                    </span>
+                  </td>
+                  <td className={cellClass}>
+                    <span className="text-sm flex items-center gap-1">
+                      {foundedInfo !== "—" && (
+                        <Calendar className="h-3 w-3 text-muted-foreground shrink-0" />
+                      )}
+                      {foundedInfo}
+                    </span>
+                  </td>
+                  <td className={cellClass}>
+                    {company.website ? (
+                      <a
+                        href={company.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-sm text-primary hover:underline flex items-center gap-1"
+                      >
+                        <Globe className="h-3 w-3 shrink-0" />
+                        Site web
+                      </a>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </td>
+                  <td className={cellClass}>
+                    {company.linkedinUrl ? (
                       <a
                         href={company.linkedinUrl}
                         target="_blank"
@@ -147,7 +158,11 @@ export function CompaniesTableView({ companies }: CompaniesTableViewProps) {
                       >
                         <Linkedin className="h-4 w-4" />
                       </a>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
                     )}
+                  </td>
+                  <td className={cellClass}>
                     <Link
                       href={`/companies/${company.id}`}
                       onClick={(e) => e.stopPropagation()}
@@ -156,13 +171,13 @@ export function CompaniesTableView({ companies }: CompaniesTableViewProps) {
                     >
                       <ExternalLink className="h-4 w-4" />
                     </Link>
-                  </div>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

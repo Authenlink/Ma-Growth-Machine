@@ -141,6 +141,22 @@ export const companies = pgTable("companies", {
       { score?: number; title?: string }
     >;
   }>(),
+  pageSpeedData: jsonb("page_speed_data").$type<{
+    mobile?: {
+      performance: number;
+      accessibility: number;
+      bestPractices: number;
+      seo: number;
+      audits?: Record<string, { score?: number; title?: string }>;
+    };
+    desktop?: {
+      performance: number;
+      accessibility: number;
+      bestPractices: number;
+      seo: number;
+      audits?: Record<string, { score?: number; title?: string }>;
+    };
+  }>(),
   seoAnalyzedAt: timestamp("seo_analyzed_at"),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),

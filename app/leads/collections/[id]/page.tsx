@@ -120,7 +120,7 @@ export default function CollectionDetailPage({ params }: Props) {
     null,
   );
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<ViewMode>("cards");
+  const [viewMode, setViewMode] = useState<ViewMode>("table");
   const [currentPage, setCurrentPage] = useState(1);
   const [filters, setFilters] = useState<{
     collectionId?: string;

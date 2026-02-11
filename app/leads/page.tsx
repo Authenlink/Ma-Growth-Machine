@@ -78,7 +78,7 @@ export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loadingCollections, setLoadingCollections] = useState(true);
   const [loadingLeads, setLoadingLeads] = useState(true);
-  const [viewMode, setViewMode] = useState<ViewMode>("cards");
+  const [viewMode, setViewMode] = useState<ViewMode>("table");
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState<{
     totalItems: number;
@@ -225,7 +225,7 @@ export default function LeadsPage() {
           </div>
         </header>
 
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-6">
+        <div className="flex flex-1 flex-col gap-4 p-4 pt-6 overflow-x-hidden">
           <div className="flex items-center justify-between mb-2">
             <div>
               <h1 className="text-2xl font-bold">Leads</h1>

@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { collections, leads, companies, leadCollections } from "@/lib/schema";
 import { eq, and } from "drizzle-orm";
 import {
-  fetchPageSpeedSeo,
+  fetchPageSpeedFull,
   normalizeWebsiteUrl,
 } from "@/lib/pagespeed-seo-service";
 
@@ -36,13 +36,11 @@ export async function POST(request: NextRequest) {
       leadId,
       companyId,
       collectionId,
-      strategy = "mobile",
     } = body as {
       mode?: "single" | "collection";
       leadId?: number;
       companyId?: number;
       collectionId?: number;
-      strategy?: "mobile" | "desktop";
     };
 
     if (!mode || !["single", "collection"].includes(mode)) {
@@ -51,9 +49,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-
-    const validStrategy =
-      strategy === "desktop" ? "desktop" : "mobile";
 
     if (mode === "single") {
       let companyIdToUse: number | null = null;
@@ -133,9 +128,9 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const result = await fetchPageSpeedSeo(normalUrl, validStrategy);
+      const result = await fetchPageSpeedFull(normalUrl);
 
-      if (!result.success) {
+      if (!result.success || (!result.mobile && !result.desktop)) {
         return NextResponse.json(
           {
             error: result.error || "Erreur lors de l'analyse SEO",
@@ -145,7 +140,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      if (!result.seoData || !companyIdToUse) {
+      if (!companyIdToUse) {
         return NextResponse.json(
           {
             error: "Aucune donnée SEO extraite",
@@ -155,17 +150,27 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const mobile = result.mobile;
+      const desktop = result.desktop;
+      const pageSpeedData = {
+        ...(mobile && { mobile }),
+        ...(desktop && { desktop }),
+      };
+
       const updateData: Record<string, unknown> = {
-        seoScore: result.seoData.score,
-        seoData: result.seoData,
+        pageSpeedData,
+        seoScore: mobile?.seo ?? desktop?.seo,
+        seoScoreMobile: mobile?.seo,
+        seoScoreDesktop: desktop?.seo,
+        seoData: mobile
+          ? { score: mobile.seo, strategy: "mobile", audits: mobile.audits }
+          : desktop
+            ? { score: desktop.seo, strategy: "desktop", audits: desktop.audits }
+            : undefined,
         seoAnalyzedAt: new Date(),
         updatedAt: new Date(),
       };
-      if (validStrategy === "mobile") {
-        updateData.seoScoreMobile = result.seoData.score;
-      } else {
-        updateData.seoScoreDesktop = result.seoData.score;
-      }
+
       await db
         .update(companies)
         .set(updateData as typeof companies.$inferInsert)
@@ -173,6 +178,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
+        companyId: companyIdToUse,
         metrics: {
           analyzed: 1,
           skipped: 0,
@@ -252,20 +258,30 @@ export async function POST(request: NextRequest) {
       }
 
       const { companyId: cid, website: w } = toAnalyze[i];
-      const result = await fetchPageSpeedSeo(w, validStrategy);
+      const result = await fetchPageSpeedFull(w);
 
-      if (result.success && result.seoData) {
+      if (result.success && (result.mobile || result.desktop)) {
+        const mobile = result.mobile;
+        const desktop = result.desktop;
+        const pageSpeedData = {
+          ...(mobile && { mobile }),
+          ...(desktop && { desktop }),
+        };
+
         const updateData: Record<string, unknown> = {
-          seoScore: result.seoData.score,
-          seoData: result.seoData,
+          pageSpeedData,
+          seoScore: mobile?.seo ?? desktop?.seo,
+          seoScoreMobile: mobile?.seo,
+          seoScoreDesktop: desktop?.seo,
+          seoData: mobile
+            ? { score: mobile.seo, strategy: "mobile", audits: mobile.audits }
+            : desktop
+              ? { score: desktop.seo, strategy: "desktop", audits: desktop.audits }
+              : undefined,
           seoAnalyzedAt: new Date(),
           updatedAt: new Date(),
         };
-        if (validStrategy === "mobile") {
-          updateData.seoScoreMobile = result.seoData.score;
-        } else {
-          updateData.seoScoreDesktop = result.seoData.score;
-        }
+
         await db
           .update(companies)
           .set(updateData as typeof companies.$inferInsert)

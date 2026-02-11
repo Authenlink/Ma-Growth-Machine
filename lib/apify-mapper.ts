@@ -56,7 +56,7 @@ export interface ApifyLeadData {
  */
 function parseFunctional(functional?: string): string[] | null {
   if (!functional) return null;
-  
+
   try {
     // Le format est "['sales']" ou similaire
     // On essaie de parser comme JSON d'abord
@@ -68,6 +68,33 @@ function parseFunctional(functional?: string): string[] | null {
   } catch {
     // Si ce n'est pas du JSON valide, retourner comme array avec un seul élément
     return functional.trim() ? [functional] : null;
+  }
+}
+
+/**
+ * Parse les URLs LinkedIn qui peuvent être sous forme de string ou de tableau
+ * Format attendu: "http://www.linkedin.com/company/3284074" ou "['http://www.linkedin.com/company/3284074']"
+ */
+function parseLinkedinUrl(linkedinUrl?: string): string | null {
+  if (!linkedinUrl || linkedinUrl.trim() === "") {
+    return null;
+  }
+
+  const trimmed = linkedinUrl.trim();
+
+  try {
+    // Essayer de parser comme JSON d'abord (au cas où c'est un tableau)
+    const parsed = JSON.parse(trimmed);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      // Prendre le premier élément du tableau
+      const url = parsed[0];
+      return typeof url === "string" ? url.trim() : null;
+    }
+    // Si ce n'est pas un tableau, traiter comme une string normale
+    return trimmed;
+  } catch {
+    // Si ce n'est pas du JSON valide, retourner la string telle quelle
+    return trimmed;
   }
 }
 
@@ -148,32 +175,30 @@ async function getOrCreateCompany(
     .insert(companies)
     .values({
       name: companyData.orgName,
-      website: companyData.orgWebsite && companyData.orgWebsite.trim() !== "" 
-        ? companyData.orgWebsite 
+      website: companyData.orgWebsite && companyData.orgWebsite.trim() !== ""
+        ? companyData.orgWebsite
         : null,
       domain: domain || null,
-      linkedinUrl: companyData.orgLinkedinUrl && companyData.orgLinkedinUrl.trim() !== "" 
-        ? companyData.orgLinkedinUrl 
-        : null,
+      linkedinUrl: parseLinkedinUrl(companyData.orgLinkedinUrl),
       foundedYear: parseFoundedYear(companyData.orgFoundedYear),
-      industry: companyData.orgIndustry && companyData.orgIndustry.trim() !== "" 
-        ? companyData.orgIndustry 
+      industry: companyData.orgIndustry && companyData.orgIndustry.trim() !== ""
+        ? companyData.orgIndustry
         : null,
-      size: companyData.orgSize && companyData.orgSize.trim() !== "" 
-        ? companyData.orgSize 
+      size: companyData.orgSize && companyData.orgSize.trim() !== ""
+        ? companyData.orgSize
         : null,
-      description: companyData.orgDescription && companyData.orgDescription.trim() !== "" 
-        ? companyData.orgDescription 
+      description: companyData.orgDescription && companyData.orgDescription.trim() !== ""
+        ? companyData.orgDescription
         : null,
       specialities: null, // Pas de champ spécialités dans les données Apify
-      city: companyData.orgCity && companyData.orgCity.trim() !== "" 
-        ? companyData.orgCity 
+      city: companyData.orgCity && companyData.orgCity.trim() !== ""
+        ? companyData.orgCity
         : null,
-      state: companyData.orgState && companyData.orgState.trim() !== "" 
-        ? companyData.orgState 
+      state: companyData.orgState && companyData.orgState.trim() !== ""
+        ? companyData.orgState
         : null,
-      country: companyData.orgCountry && companyData.orgCountry.trim() !== "" 
-        ? companyData.orgCountry 
+      country: companyData.orgCountry && companyData.orgCountry.trim() !== ""
+        ? companyData.orgCountry
         : null,
     })
     .returning();
@@ -234,7 +259,7 @@ async function enrichLead(
     updateData.position = data.position;
   }
   if (!existingLead.linkedinUrl && data.linkedinUrl) {
-    updateData.linkedinUrl = data.linkedinUrl;
+    updateData.linkedinUrl = parseLinkedinUrl(data.linkedinUrl);
   }
   if (!existingLead.seniority && data.seniority) {
     updateData.seniority = data.seniority;
@@ -383,7 +408,7 @@ export async function mapApifyDataToLeads(
         firstName: data.firstName && data.firstName.trim() !== "" ? data.firstName : null,
         lastName: data.lastName && data.lastName.trim() !== "" ? data.lastName : null,
         position: data.position && data.position.trim() !== "" ? data.position : null,
-        linkedinUrl: data.linkedinUrl && data.linkedinUrl.trim() !== "" ? data.linkedinUrl : null,
+        linkedinUrl: parseLinkedinUrl(data.linkedinUrl),
         seniority: data.seniority && data.seniority.trim() !== "" ? data.seniority : null,
         functional: functionalArray && functionalArray.length > 0 
           ? functionalArray.join(", ") 

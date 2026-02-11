@@ -78,6 +78,13 @@
       "when": 1770725956098,
       "tag": "0010_many_sentinels",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1770734978503,
+      "tag": "0011_great_rawhide_kid",
+      "breakpoints": true
     }
   ]
 }

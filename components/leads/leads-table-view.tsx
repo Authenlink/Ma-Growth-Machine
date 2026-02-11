@@ -4,7 +4,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Mail, Linkedin, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { cleanIndustry } from "@/lib/utils";
 
 interface Lead {
   id: number;
@@ -35,7 +34,7 @@ interface Lead {
   collection: {
     id: number;
     name: string;
-  } | null; // Pour la compatibilité
+  } | null;
   createdAt: Date;
 }
 
@@ -55,6 +54,23 @@ export function LeadsTableView({ leads, onDeleteLead }: LeadsTableViewProps) {
     return "—";
   };
 
+  const getLocation = (lead: Lead) => {
+    const parts = [];
+    if (lead.city) parts.push(lead.city);
+    if (lead.state) parts.push(lead.state);
+    if (lead.country) parts.push(lead.country);
+    return parts.length > 0 ? parts.join(", ") : "—";
+  };
+
+  const formatDate = (date: Date) => {
+    const d = typeof date === "string" ? new Date(date) : date;
+    return d.toLocaleDateString("fr-FR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  };
+
   if (leads.length === 0) {
     return (
       <div className="text-center py-12 text-muted-foreground">
@@ -63,175 +79,180 @@ export function LeadsTableView({ leads, onDeleteLead }: LeadsTableViewProps) {
     );
   }
 
-  return (
-    <div className="rounded-md border overflow-x-auto">
-      <table className="w-full">
-        <thead>
-          <tr className="border-b bg-muted/50">
-            <th className="h-12 px-4 text-left align-middle font-medium text-sm">
-              Nom
-            </th>
-            <th className="h-12 px-4 text-left align-middle font-medium text-sm">
-              Position
-            </th>
-            <th className="h-12 px-4 text-left align-middle font-medium text-sm">
-              Entreprise
-            </th>
-            <th className="h-12 px-4 text-left align-middle font-medium text-sm">
-              Email
-            </th>
-            <th className="h-12 px-4 text-left align-middle font-medium text-sm">
-              Seniority
-            </th>
-            <th className="h-12 px-4 text-left align-middle font-medium text-sm">
-              Functional
-            </th>
-            <th className="h-12 px-4 text-left align-middle font-medium text-sm">
-              Status
-            </th>
-            <th className="h-12 px-4 text-left align-middle font-medium text-sm">
-              Validé
-            </th>
-            <th className="h-12 px-4 text-left align-middle font-medium text-sm">
-              Collection
-            </th>
-            <th className="h-12 px-4 text-left align-middle font-medium text-sm">
-              Actions
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {leads.map((lead) => {
-            const displayName = getDisplayName(lead);
+  const headerCellClass =
+    "h-10 px-3 text-left align-middle font-medium text-xs border-r border-border last:border-r-0 sticky top-0 bg-muted z-[2]";
+  const stickyHeaderClass = `${headerCellClass} left-0 z-[3] min-w-[180px] border-r border-border shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]`;
+  const cellClass =
+    "px-3 py-2 align-middle text-sm border-r border-border last:border-r-0";
+  const getStickyCellClass = (isEvenRow: boolean) =>
+    `${cellClass} sticky left-0 z-[1] min-w-[180px] border-r border-border shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] ${isEvenRow ? "bg-muted" : "bg-background"}`;
 
-            return (
-              <tr
-                key={lead.id}
-                className="border-b transition-colors hover:bg-muted/50 cursor-pointer"
-                onClick={() => (window.location.href = `/leads/${lead.id}`)}
-              >
-                <td className="p-4 align-middle">
-                  <Link
-                    href={`/leads/${lead.id}`}
-                    onClick={(e) => e.stopPropagation()}
-                    className="font-medium hover:underline text-primary"
-                  >
-                    {displayName}
-                  </Link>
-                </td>
-                <td className="p-4 align-middle">
-                  <div className="text-sm">{lead.position || "—"}</div>
-                </td>
-                <td className="p-4 align-middle">
-                  <div className="space-y-1">
+  return (
+    <div className="rounded-md border max-w-full max-h-[calc(100vh-250px)] overflow-auto">
+      <div className="min-w-fit">
+        <table className="w-full border-collapse min-w-max">
+          <thead>
+            <tr className="border-b border-border">
+              <th className={stickyHeaderClass}>Nom</th>
+              <th className={headerCellClass}>Position</th>
+              <th className={headerCellClass}>Entreprise</th>
+              <th className={headerCellClass}>Taille</th>
+              <th className={headerCellClass}>Email</th>
+              <th className={headerCellClass}>Localisation</th>
+              <th className={headerCellClass}>Seniority</th>
+              <th className={headerCellClass}>Functional</th>
+              <th className={headerCellClass}>Status</th>
+              <th className={headerCellClass}>Validé</th>
+              <th className={headerCellClass}>LinkedIn</th>
+              <th className={headerCellClass}>Collection</th>
+              <th className={headerCellClass}>Date création</th>
+              <th className={headerCellClass}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {leads.map((lead, index) => {
+              const displayName = getDisplayName(lead);
+              const location = getLocation(lead);
+
+              return (
+                <tr
+                  key={lead.id}
+                  className="border-b border-border transition-colors hover:bg-muted/50 cursor-pointer even:bg-muted/30"
+                  onClick={() => (window.location.href = `/leads/${lead.id}`)}
+                >
+                  <td className={getStickyCellClass(index % 2 === 1)}>
+                    <Link
+                      href={`/leads/${lead.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="font-medium hover:underline text-primary"
+                    >
+                      {displayName}
+                    </Link>
+                  </td>
+                  <td className={cellClass}>
+                    <span className="text-sm">{lead.position || "—"}</span>
+                  </td>
+                  <td className={cellClass}>
                     {lead.company ? (
-                      <>
-                        <Link
-                          href={`/companies/${lead.company.id}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="font-medium text-sm hover:underline text-primary block"
-                        >
-                          {lead.company.name}
-                        </Link>
-                        {lead.company.industry && (
-                          <div className="text-xs text-muted-foreground">
-                            {cleanIndustry(lead.company.industry)}
-                          </div>
-                        )}
-                      </>
+                      <Link
+                        href={`/companies/${lead.company.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="font-medium text-sm hover:underline text-primary block"
+                      >
+                        {lead.company.name}
+                      </Link>
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
-                  </div>
-                </td>
-                <td className="p-4 align-middle">
-                  {lead.email ? (
-                    <a
-                      href={`mailto:${lead.email}`}
-                      onClick={(e) => e.stopPropagation()}
-                      className="text-sm text-primary hover:underline flex items-center gap-1"
-                    >
-                      <Mail className="h-3 w-3" />
-                      {lead.email}
-                    </a>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </td>
-                <td className="p-4 align-middle">
-                  {lead.seniority ? (
-                    <Badge variant="outline" className="text-xs">
-                      {lead.seniority}
-                    </Badge>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </td>
-                <td className="p-4 align-middle">
-                  {lead.functional ? (
-                    <Badge variant="outline" className="text-xs">
-                      {lead.functional}
-                    </Badge>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </td>
-                <td className="p-4 align-middle">
-                  {lead.status ? (
-                    <Badge variant="secondary" className="text-xs">
-                      {lead.status}
-                    </Badge>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </td>
-                <td className="p-4 align-middle">
-                  {lead.validated ? (
-                    <Badge variant="success" className="text-xs">
-                      Oui
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline" className="text-xs">
-                      Non
-                    </Badge>
-                  )}
-                </td>
-                <td className="p-4 align-middle">
-                  <div className="flex flex-wrap gap-1">
-                    {lead.collections && lead.collections.length > 0 ? (
-                      lead.collections.slice(0, 2).map((collection) => (
-                        <Badge key={collection.id} variant="outline" className="text-xs">
-                          {collection.name}
-                        </Badge>
-                      ))
-                    ) : lead.collection ? (
+                  </td>
+                  <td className={cellClass}>
+                    <span className="text-sm">{lead.company?.size || "—"}</span>
+                  </td>
+                  <td className={cellClass}>
+                    {lead.email ? (
+                      <a
+                        href={`mailto:${lead.email}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-sm text-primary hover:underline flex items-center gap-1"
+                      >
+                        <Mail className="h-3 w-3 shrink-0" />
+                        {lead.email}
+                      </a>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </td>
+                  <td className={cellClass}>
+                    <span className="text-sm">{location}</span>
+                  </td>
+                  <td className={cellClass}>
+                    {lead.seniority ? (
                       <Badge variant="outline" className="text-xs">
-                        {lead.collection.name}
+                        {lead.seniority}
                       </Badge>
                     ) : (
-                      <span className="text-xs text-muted-foreground">Aucune</span>
+                      <span className="text-muted-foreground">—</span>
                     )}
-                    {lead.collections && lead.collections.length > 2 && (
+                  </td>
+                  <td className={cellClass}>
+                    {lead.functional ? (
                       <Badge variant="outline" className="text-xs">
-                        +{lead.collections.length - 2}
+                        {lead.functional}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </td>
+                  <td className={cellClass}>
+                    {lead.status ? (
+                      <Badge variant="secondary" className="text-xs">
+                        {lead.status}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </td>
+                  <td className={cellClass}>
+                    {lead.validated ? (
+                      <Badge variant="success" className="text-xs">
+                        Oui
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-xs">
+                        Non
                       </Badge>
                     )}
-                  </div>
-                </td>
-                <td className="p-4 align-middle">
-                  <div className="flex items-center gap-2">
-                    {lead.linkedinUrl && (
+                  </td>
+                  <td className={cellClass}>
+                    {lead.linkedinUrl ? (
                       <a
                         href={lead.linkedinUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        className="text-muted-foreground hover:text-foreground"
+                        className="text-muted-foreground hover:text-primary transition-colors"
                         title="Voir sur LinkedIn"
                       >
                         <Linkedin className="h-4 w-4" />
                       </a>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
                     )}
+                  </td>
+                  <td className={cellClass}>
+                    <div className="flex flex-wrap gap-1">
+                      {lead.collections && lead.collections.length > 0 ? (
+                        lead.collections.slice(0, 2).map((collection) => (
+                          <Badge
+                            key={collection.id}
+                            variant="outline"
+                            className="text-xs"
+                          >
+                            {collection.name}
+                          </Badge>
+                        ))
+                      ) : lead.collection ? (
+                        <Badge variant="outline" className="text-xs">
+                          {lead.collection.name}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          Aucune
+                        </span>
+                      )}
+                      {lead.collections && lead.collections.length > 2 && (
+                        <Badge variant="outline" className="text-xs">
+                          +{lead.collections.length - 2}
+                        </Badge>
+                      )}
+                    </div>
+                  </td>
+                  <td className={cellClass}>
+                    <span className="text-sm">
+                      {formatDate(lead.createdAt)}
+                    </span>
+                  </td>
+                  <td className={cellClass}>
                     {onDeleteLead && (
                       <Button
                         variant="ghost"
@@ -246,13 +267,13 @@ export function LeadsTableView({ leads, onDeleteLead }: LeadsTableViewProps) {
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     )}
-                  </div>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

@@ -99,7 +99,6 @@ function SeoInsightsPageContent() {
   const [mode, setMode] = useState<"single" | "collection">("single");
   const [singleValue, setSingleValue] = useState<SingleSelectValue>(null);
   const [collectionId, setCollectionId] = useState<number | null>(null);
-  const [strategy, setStrategy] = useState<"mobile" | "desktop">("mobile");
 
   const [collections, setCollections] = useState<Collection[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -259,10 +258,7 @@ function SeoInsightsPageContent() {
     setResult({ status: "idle" });
 
     try {
-      const body: Record<string, unknown> = {
-        mode,
-        strategy,
-      };
+      const body: Record<string, unknown> = { mode };
 
       if (mode === "single" && singleValue) {
         if (singleValue.type === "lead") body.leadId = singleValue.id;
@@ -288,6 +284,10 @@ function SeoInsightsPageContent() {
         toast.success(
           `Analyse terminée : ${data.metrics.analyzed} site(s) analysé(s)`,
         );
+        if (mode === "single" && data.companyId) {
+          router.push(`/companies/${data.companyId}`);
+          return;
+        }
       } else {
         setResult({
           status: "error",
@@ -486,27 +486,9 @@ function SeoInsightsPageContent() {
                     </div>
                   )}
 
-                  <div className="space-y-2">
-                    <Label htmlFor="strategy-select">Stratégie</Label>
-                    <Select
-                      value={strategy}
-                      onValueChange={(v) =>
-                        setStrategy(v as "mobile" | "desktop")
-                      }
-                    >
-                      <SelectTrigger id="strategy-select">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="mobile">Mobile</SelectItem>
-                        <SelectItem value="desktop">Desktop</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                      Mobile simule un appareil mobile, Desktop un navigateur
-                      desktop
-                    </p>
-                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    L&apos;analyse sera effectuée pour mobile et desktop
+                  </p>
 
                   <Button
                     onClick={handleSubmit}
