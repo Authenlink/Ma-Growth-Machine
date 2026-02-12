@@ -722,7 +722,7 @@ export default function DashboardPage() {
                       />
                       <Area
                         dataKey="failed"
-                        type="monotone"
+                        type="natural"
                         fill="url(#fillSpendingFailed)"
                         stroke="var(--color-failed)"
                         stackId="runs"
@@ -730,7 +730,7 @@ export default function DashboardPage() {
                       />
                       <Area
                         dataKey="succeeded"
-                        type="monotone"
+                        type="natural"
                         fill="url(#fillSpendingSucceeded)"
                         stroke="var(--color-succeeded)"
                         stackId="runs"
@@ -738,7 +738,7 @@ export default function DashboardPage() {
                       />
                       <Area
                         dataKey="costUsd"
-                        type="monotone"
+                        type="natural"
                         fill="url(#fillSpendingCostUsd)"
                         stroke="var(--color-costUsd)"
                         yAxisId="left"
