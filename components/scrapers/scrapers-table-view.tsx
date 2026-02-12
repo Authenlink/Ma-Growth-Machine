@@ -147,15 +147,13 @@ export function ScrapersTableView({ scrapers }: ScrapersTableViewProps) {
                   {/* IA */}
                   <td className={cellClass}>
                     {scraper.usesAi ? (
-                      <Sparkles
-                        className="h-4 w-4 text-primary"
-                        title="Scraper IA"
-                      />
+                      <span title="Scraper IA">
+                        <Sparkles className="h-4 w-4 text-primary" />
+                      </span>
                     ) : (
-                      <Minus
-                        className="h-4 w-4 text-muted-foreground/50"
-                        title="Sans IA"
-                      />
+                      <span title="Sans IA">
+                        <Minus className="h-4 w-4 text-muted-foreground/50" />
+                      </span>
                     )}
                   </td>
 
