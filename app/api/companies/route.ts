@@ -1,9 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { companies } from "@/lib/schema";
+import {
+  companies,
+  entityScraperUsages,
+  scrapers,
+  trustpilotReviews,
+  leads,
+} from "@/lib/schema";
 import { extractDomain } from "@/lib/bulk-email-finder-mapper";
-import { and, or, like, desc, sql, eq } from "drizzle-orm";
+import { and, like, sql, eq, exists, isNotNull, ne, getTableColumns } from "drizzle-orm";
+import {
+  FILTERABLE_SOURCE_TYPES,
+  SOURCE_USE_ENTITY_SCRAPER_USAGES,
+} from "@/lib/source-types";
+import { FILTERABLE_SCORE_CATEGORIES, getScoreCategory, type ScoreCategory } from "@/lib/score-types";
+import {
+  buildCompanyScoreSqlExpression,
+  buildCompanyScoreCategoryCondition,
+} from "@/lib/company-scoring";
 
 function normalizeWebsite(input?: string | null): string | null {
   if (!input || input.trim() === "") return null;
@@ -17,6 +32,16 @@ function normalizeWebsite(input?: string | null): string | null {
 // GET /api/companies - Liste toutes les entreprises avec filtres
 export async function GET(request: NextRequest) {
   try {
+    const session = await auth();
+
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "Non authentifié" },
+        { status: 401 }
+      );
+    }
+
+    const userId = parseInt(session.user.id);
     const searchParams = request.nextUrl.searchParams;
 
     // Récupérer les paramètres de filtres
@@ -25,6 +50,16 @@ export async function GET(request: NextRequest) {
     const size = searchParams.get("size");
     const country = searchParams.get("country");
     const city = searchParams.get("city");
+    const sourceTypesRaw = searchParams.getAll("sourceTypes");
+    const sourceTypes = sourceTypesRaw
+      .flatMap((s) => s.split(",").map((t) => t.trim()))
+      .filter((t) => t && FILTERABLE_SOURCE_TYPES.includes(t));
+
+    const scoreCategoryRaw = searchParams.get("scoreCategory");
+    const scoreCategory: ScoreCategory | null =
+      scoreCategoryRaw && FILTERABLE_SCORE_CATEGORIES.includes(scoreCategoryRaw as ScoreCategory)
+        ? (scoreCategoryRaw as ScoreCategory)
+        : null;
 
     // Paramètres de pagination
     const page = parseInt(searchParams.get("page") || "1");
@@ -69,6 +104,62 @@ export async function GET(request: NextRequest) {
       conditions.push(like(companies.city, `%${city.trim()}%`));
     }
 
+    // Filtre par sources (enrichissements) - AND : l'entreprise doit avoir la source pour chaque mapperType
+    const sourceTypeConditions = sourceTypes.map((mapperType) => {
+      if (SOURCE_USE_ENTITY_SCRAPER_USAGES[mapperType] !== false) {
+        return exists(
+          db
+            .select()
+            .from(entityScraperUsages)
+            .innerJoin(
+              scrapers,
+              eq(entityScraperUsages.scraperId, scrapers.id)
+            )
+            .where(
+              and(
+                eq(entityScraperUsages.entityType, "company"),
+                eq(entityScraperUsages.entityId, companies.id),
+                eq(entityScraperUsages.hasResult, true),
+                eq(entityScraperUsages.userId, userId),
+                eq(scrapers.mapperType, mapperType)
+              )
+            )
+        );
+      }
+      if (mapperType === "trustpilot-reviews") {
+        return exists(
+          db
+            .select()
+            .from(trustpilotReviews)
+            .where(eq(trustpilotReviews.companyId, companies.id))
+        );
+      }
+      if (mapperType === "email-verify") {
+        return exists(
+          db
+            .select()
+            .from(leads)
+            .where(
+              and(
+                eq(leads.companyId, companies.id),
+                eq(leads.userId, userId),
+                isNotNull(leads.emailVerifyEmaillist),
+                ne(leads.emailVerifyEmaillist, "")
+              )
+            )
+        );
+      }
+      return sql`true`;
+    });
+
+    if (sourceTypeConditions.length > 0) {
+      conditions.push(and(...sourceTypeConditions)!);
+    }
+
+    if (scoreCategory) {
+      conditions.push(buildCompanyScoreCategoryCondition(scoreCategory));
+    }
+
     // Construire la condition where finale
     const whereCondition = conditions.length > 0 ? and(...conditions)! : undefined;
 
@@ -86,7 +177,10 @@ export async function GET(request: NextRequest) {
 
     // Requête pour récupérer les entreprises
     const results = await db
-      .select()
+      .select({
+        ...getTableColumns(companies),
+        score: buildCompanyScoreSqlExpression(),
+      })
       .from(companies)
       .where(whereCondition || undefined)
       .orderBy(companies.name)
@@ -95,8 +189,18 @@ export async function GET(request: NextRequest) {
 
     const totalPages = Math.ceil(totalItems / limit);
 
+    const resultsWithScore = results.map((company) => {
+      const score = typeof company.score === "number" ? company.score : 0;
+      const { score: _s, ...rest } = company;
+      return {
+        ...rest,
+        score,
+        scoreCategory: getScoreCategory(score),
+      };
+    });
+
     return NextResponse.json({
-      data: results,
+      data: resultsWithScore,
       pagination: {
         page,
         limit,

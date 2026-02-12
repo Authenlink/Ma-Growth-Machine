@@ -254,14 +254,15 @@ export default function LeadDetailPage() {
 
     setVerifyingEmail(true);
     try {
-      const response = await fetch(`/api/leads/${lead.id}/verify-email`, {
-        method: "POST",
-      });
+      const response = await fetch(
+        `/api/leads/${lead.id}/verify-email-apify`,
+        { method: "POST" },
+      );
       const data = await response.json();
 
       if (response.ok) {
         toast.success(
-          `Email vérifié : ${data.result}${data.verifiedAt ? ` (${new Date(data.verifiedAt).toLocaleDateString("fr-FR")})` : ""}`
+          `Email vérifié : ${data.result || "OK"}${data.emailCertainty ? ` (${data.emailCertainty})` : ""}`,
         );
         const refreshResponse = await fetch(`/api/leads/${lead.id}`);
         if (refreshResponse.ok) {
@@ -281,8 +282,16 @@ export default function LeadDetailPage() {
 
   const getEmailVerifyBadgeVariant = (status: string | null) => {
     if (!status) return "outline";
-    const ok = ["ok", "ok_for_all"];
-    const invalid = ["email_disabled", "dead_server", "invalid_mx", "disposable", "spamtrap", "invalid_syntax"];
+    const ok = ["ok", "ok_for_all", "valid"];
+    const invalid = [
+      "email_disabled",
+      "dead_server",
+      "invalid_mx",
+      "disposable",
+      "spamtrap",
+      "invalid_syntax",
+      "invalid",
+    ];
     if (ok.includes(status)) return "success";
     if (invalid.includes(status)) return "destructive";
     return "secondary";
@@ -293,6 +302,7 @@ export default function LeadDetailPage() {
     const labels: Record<string, string> = {
       ok: "Délivrable",
       ok_for_all: "Accepte tout",
+      valid: "Délivrable",
       email_disabled: "Désactivé",
       dead_server: "Serveur mort",
       invalid_mx: "MX invalide",
@@ -301,6 +311,7 @@ export default function LeadDetailPage() {
       smtp_protocol: "SMTP inconnu",
       antispam_system: "Anti-spam",
       invalid_syntax: "Syntaxe invalide",
+      invalid: "Invalide",
       unknown: "Inconnu",
       error_credit: "Crédits insuffisants",
     };

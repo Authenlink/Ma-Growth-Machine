@@ -15,16 +15,30 @@ export async function resetImportedScraperRuns(userId: number): Promise<number> 
   return result.length;
 }
 
+/** Alias actId Apify (short ID) -> actorId complet pour le mapping */
+const ACT_ID_ALIASES: Record<string, string> = {
+  QM5YJIYftbZQiNpgN:
+    "xmiso_scrapers/easy-bulk-email-validator---verify-emails-from-1-7-1000-rows",
+};
+
 /**
  * Construit une map actId (Apify) -> scraperId (notre table scrapers)
  */
 async function buildActIdToScraperIdMap(): Promise<Map<string, number>> {
-  const allScrapers = await db.select({ id: scrapers.id, providerConfig: scrapers.providerConfig }).from(scrapers);
+  const allScrapers = await db
+    .select({ id: scrapers.id, providerConfig: scrapers.providerConfig })
+    .from(scrapers);
   const map = new Map<string, number>();
   for (const s of allScrapers) {
-    const actorId = (s.providerConfig as Record<string, unknown>)?.actorId;
+    const actorId = (s.providerConfig as Record<string, unknown>)
+      ?.actorId as string | undefined;
     if (typeof actorId === "string" && actorId.trim()) {
-      map.set(actorId.trim(), s.id);
+      const trimmed = actorId.trim();
+      map.set(trimmed, s.id);
+      const shortId = Object.keys(ACT_ID_ALIASES).find(
+        (k) => ACT_ID_ALIASES[k] === trimmed,
+      );
+      if (shortId) map.set(shortId, s.id);
     }
   }
   return map;

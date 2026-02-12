@@ -61,6 +61,8 @@ export default function CompaniesPage() {
     size?: string;
     country?: string;
     city?: string;
+    sourceTypes?: string[];
+    scoreCategory?: string;
   }>({});
 
   // Charger les entreprises avec filtres et pagination
@@ -69,7 +71,9 @@ export default function CompaniesPage() {
     try {
       const params = new URLSearchParams();
       Object.entries(filters).forEach(([key, value]) => {
-        if (value) {
+        if (Array.isArray(value)) {
+          value.forEach((v) => params.append(key, v));
+        } else if (value) {
           params.append(key, value);
         }
       });

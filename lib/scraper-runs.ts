@@ -10,6 +10,8 @@ export type ScraperRunSource =
   | "enrich_emails_collection"
   | "enrich_emails_company"
   | "find_email"
+  | "verify_email_apify"
+  | "verify_emails_collection_apify"
   | "trustpilot"
   | "seo_local_ranking"
   | "import"; // Backfill depuis l'API Apify

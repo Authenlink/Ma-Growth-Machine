@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { collections, leads, companies, leadCollections } from "@/lib/schema";
+import { collections, leads, companies, leadCollections, scrapers } from "@/lib/schema";
 import { eq, and } from "drizzle-orm";
 import {
   fetchPageSpeedFull,
   normalizeWebsiteUrl,
 } from "@/lib/pagespeed-seo-service";
+import { recordEntityScraperUsage } from "@/lib/entity-scraper-usages";
 
 const DELAY_BETWEEN_REQUESTS_MS = 1500;
 
@@ -49,6 +50,14 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Récupérer l'ID du scraper pagespeed-seo pour le tracking
+    const seoScraper = await db
+      .select({ id: scrapers.id })
+      .from(scrapers)
+      .where(eq(scrapers.mapperType, "pagespeed-seo"))
+      .limit(1);
+    const seoScraperId = seoScraper[0]?.id ?? null;
 
     if (mode === "single") {
       let companyIdToUse: number | null = null;
@@ -131,6 +140,23 @@ export async function POST(request: NextRequest) {
       const result = await fetchPageSpeedFull(normalUrl);
 
       if (!result.success || (!result.mobile && !result.desktop)) {
+        if (companyIdToUse != null && seoScraperId != null) {
+          try {
+            await recordEntityScraperUsage({
+              entityType: "company",
+              entityId: companyIdToUse,
+              scraperId: seoScraperId,
+              runId: null,
+              source: "seo_analyze",
+              hasResult: false,
+              itemCount: 0,
+              configUsed: {},
+              userId,
+            });
+          } catch {
+            /* ignore */
+          }
+        }
         return NextResponse.json(
           {
             error: result.error || "Erreur lors de l'analyse SEO",
@@ -175,6 +201,24 @@ export async function POST(request: NextRequest) {
         .update(companies)
         .set(updateData as typeof companies.$inferInsert)
         .where(eq(companies.id, companyIdToUse));
+
+      if (seoScraperId != null) {
+        try {
+          await recordEntityScraperUsage({
+            entityType: "company",
+            entityId: companyIdToUse,
+            scraperId: seoScraperId,
+            runId: null,
+            source: "seo_analyze",
+            hasResult: true,
+            itemCount: 1,
+            configUsed: {},
+            userId,
+          });
+        } catch {
+          /* ignore */
+        }
+      }
 
       return NextResponse.json({
         success: true,
@@ -287,8 +331,43 @@ export async function POST(request: NextRequest) {
           .set(updateData as typeof companies.$inferInsert)
           .where(eq(companies.id, cid));
         analyzed++;
+
+        if (seoScraperId != null) {
+          try {
+            await recordEntityScraperUsage({
+              entityType: "company",
+              entityId: cid,
+              scraperId: seoScraperId,
+              runId: null,
+              source: "seo_analyze",
+              hasResult: true,
+              itemCount: 1,
+              configUsed: {},
+              userId,
+            });
+          } catch {
+            /* ignore */
+          }
+        }
       } else {
         errors++;
+        if (seoScraperId != null) {
+          try {
+            await recordEntityScraperUsage({
+              entityType: "company",
+              entityId: cid,
+              scraperId: seoScraperId,
+              runId: null,
+              source: "seo_analyze",
+              hasResult: false,
+              itemCount: 0,
+              configUsed: {},
+              userId,
+            });
+          } catch {
+            /* ignore */
+          }
+        }
       }
     }
 

@@ -124,13 +124,14 @@ export class LinkedInCompanyEmployeesAdapter extends ApifyAdapter {
     data: unknown[],
     collectionId: number,
     userId: number,
-    companyLinkedinUrl?: string
+    options?: { scraperId?: number; companyLinkedinUrl?: string },
   ): Promise<MappingResult> {
     return mapLinkedInEmployeesToLeads(
       data as LinkedInEmployeeData[],
       collectionId,
       userId,
-      companyLinkedinUrl
+      options?.companyLinkedinUrl,
+      { scraperId: options?.scraperId },
     );
   }
 }

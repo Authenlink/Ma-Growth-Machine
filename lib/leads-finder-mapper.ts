@@ -68,10 +68,13 @@ function normalizeLeadsFinderData(raw: Record<string, unknown>): ApifyLeadData {
 export async function mapLeadsFinderDataToLeads(
   leadsFinderData: Record<string, unknown>[],
   collectionId: number,
-  userId: number
+  userId: number,
+  options?: { scraperId?: number },
 ): Promise<{ created: number; skipped: number; errors: number }> {
   const normalizedData: ApifyLeadData[] = leadsFinderData.map((item) =>
-    normalizeLeadsFinderData(item)
+    normalizeLeadsFinderData(item),
   );
-  return mapApifyDataToLeads(normalizedData, collectionId, userId);
+  return mapApifyDataToLeads(normalizedData, collectionId, userId, {
+    scraperId: options?.scraperId,
+  });
 }

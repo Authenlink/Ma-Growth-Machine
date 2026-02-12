@@ -10,6 +10,7 @@ import {
   LinkedInPostData,
 } from "@/lib/linkedin-posts-mapper";
 import { recordScraperRun } from "@/lib/scraper-runs";
+import { recordEntityScraperUsage } from "@/lib/entity-scraper-usages";
 
 // Timeout maximum pour un run (30 minutes)
 const MAX_RUN_TIMEOUT = 30 * 60 * 1000;
@@ -173,7 +174,114 @@ export async function POST(
       (scraperConfig.providerConfig || {}) as Record<string, unknown>
     );
 
-    // Traiter chaque lead
+    // Collecter les URLs uniques selon le type de scraper
+    const urlsToScrape: string[] = [];
+    let leadUrlMap: Record<string, number[]> = {}; // URL -> [leadIds]
+
+    if (mapperType === "linkedin-company-posts") {
+      // Pour les posts d'entreprise, grouper par URL d'entreprise
+      const urlMap: Record<string, number[]> = {};
+      for (const lead of leadsToEnrich) {
+        if (lead.company?.linkedinUrl) {
+          if (!urlMap[lead.company.linkedinUrl]) {
+            urlMap[lead.company.linkedinUrl] = [];
+            urlsToScrape.push(lead.company.linkedinUrl);
+          }
+          urlMap[lead.company.linkedinUrl].push(lead.id);
+        }
+      }
+      leadUrlMap = urlMap;
+    } else {
+      // Pour les posts de profil, chaque lead a sa propre URL
+      for (const lead of leadsToEnrich) {
+        if (lead.linkedinUrl) {
+          urlsToScrape.push(lead.linkedinUrl);
+          leadUrlMap[lead.linkedinUrl] = [lead.id];
+        }
+      }
+    }
+
+    console.log(
+      `[Enrichment Collection] URLs à scraper en bulk: ${urlsToScrape.length}`
+    );
+
+    if (urlsToScrape.length === 0) {
+      return NextResponse.json({
+        success: true,
+        message: "Aucune URL à scraper",
+        metrics: {
+          total: collectionLeads.length,
+          enriched: 0,
+          skipped: collectionLeads.length,
+          errors: 0,
+        },
+      });
+    }
+
+    // Préparer les paramètres pour le scraping bulk
+    const scrapingParams: Record<string, unknown> = {
+      targetUrls: urlsToScrape,
+      maxPosts: maxPosts || 10,
+    };
+
+    if (postedDateLimit) {
+      scrapingParams.postedDateLimit = postedDateLimit;
+    }
+
+    // Exécuter le scraping bulk
+    const run = await adapter.execute(scrapingParams);
+    let runStatus = await adapter.getStatus(run.id);
+    let attempts = 0;
+    const maxAttempts = MAX_RUN_TIMEOUT / POLL_INTERVAL;
+
+    // Attendre que le run se termine
+    while (
+      runStatus.status !== "SUCCEEDED" &&
+      runStatus.status !== "FAILED" &&
+      runStatus.status !== "ABORTED" &&
+      runStatus.status !== "TIMED-OUT" &&
+      attempts < maxAttempts
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL));
+      runStatus = await adapter.getStatus(run.id);
+      attempts++;
+    }
+
+    if (runStatus.status !== "SUCCEEDED") {
+      console.error(
+        `[Enrichment Collection] Erreur du run bulk: ${runStatus.status}`
+      );
+      return NextResponse.json(
+        {
+          error: `Échec du scraping bulk: ${runStatus.status}`,
+          metrics: {
+            total: collectionLeads.length,
+            enriched: 0,
+            skipped: collectionLeads.length - leadsToEnrich.length,
+            errors: leadsToEnrich.length,
+          },
+        },
+        { status: 500 }
+      );
+    }
+
+    // Récupérer les résultats bulk
+    const items = await adapter.getResults(run.id);
+    console.log(`[Enrichment Collection] ${items.length} résultats reçus du scraping bulk`);
+
+    // Grouper les résultats par URL source
+    const resultsByUrl: Record<string, LinkedInPostData[]> = {};
+    for (const item of items as LinkedInPostData[]) {
+      const query = item.query as { targetUrl: string };
+      if (query?.targetUrl) {
+        if (!resultsByUrl[query.targetUrl]) {
+          resultsByUrl[query.targetUrl] = [];
+        }
+        resultsByUrl[query.targetUrl].push(item);
+      }
+    }
+
+    // Traiter les résultats par URL
     const results = {
       enriched: 0,
       skipped: 0,
@@ -181,141 +289,149 @@ export async function POST(
       noPosts: 0,
     };
 
-    for (const lead of leadsToEnrich) {
+    for (const [url, urlItems] of Object.entries(resultsByUrl)) {
+      const leadIds = leadUrlMap[url];
+      if (!leadIds || leadIds.length === 0) {
+        console.warn(`[Enrichment Collection] Aucune association trouvée pour l'URL ${url}`);
+        continue;
+      }
+
       try {
-        // Préparer les paramètres pour le scraper
-        const scrapingParams: Record<string, unknown> = {
-          maxPosts: maxPosts || 10,
-        };
+        // Traiter chaque lead associé à cette URL
+        for (const leadId of leadIds) {
+          const lead = leadsToEnrich.find(l => l.id === leadId);
+          if (!lead) continue;
 
-        if (postedDateLimit) {
-          scrapingParams.postedDateLimit = postedDateLimit;
-        }
+          let mappingResult;
+          let newStatus: string;
 
-        if (mapperType === "linkedin-company-posts") {
-          scrapingParams.organizationLinkedinUrl = lead.company?.linkedinUrl;
-        } else {
-          scrapingParams.linkedinUrl = lead.linkedinUrl;
-        }
+          if (urlItems.length === 0) {
+            newStatus = "no-posts";
+            mappingResult = { created: 0, skipped: 0, errors: 0 };
+            results.noPosts++;
+          } else {
+            if (mapperType === "linkedin-company-posts") {
+              mappingResult = await mapCompanyPostsToDB(
+                urlItems,
+                lead.companyId,
+                lead.company?.linkedinUrl!
+              );
+            } else {
+              mappingResult = await mapLeadPostsToDB(
+                urlItems,
+                lead.id,
+                lead.linkedinUrl!
+              );
+            }
 
-        // Exécuter le scraping
-        const run = await adapter.execute(scrapingParams);
-        let runStatus = await adapter.getStatus(run.id);
-        let attempts = 0;
-        const maxAttempts = MAX_RUN_TIMEOUT / POLL_INTERVAL;
+            if (mappingResult.created > 0) {
+              newStatus = "enriched";
+              results.enriched++;
+            } else {
+              newStatus = "no-posts";
+              results.noPosts++;
+            }
+          }
 
-        // Attendre que le run se termine
-        while (
-          runStatus.status !== "SUCCEEDED" &&
-          runStatus.status !== "FAILED" &&
-          runStatus.status !== "ABORTED" &&
-          runStatus.status !== "TIMED-OUT" &&
-          attempts < maxAttempts
-        ) {
-          await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL));
-          runStatus = await adapter.getStatus(run.id);
-          attempts++;
-        }
+          // Mettre à jour le statut du lead
+          const updateData: Record<string, unknown> = {
+            updatedAt: new Date(),
+          };
 
-        if (runStatus.status !== "SUCCEEDED") {
-          console.error(
-            `[Enrichment Collection] Erreur pour lead ${lead.id}: ${runStatus.status}`
-          );
+          if (mapperType === "linkedin-company-posts") {
+            updateData.companyLinkedinPost = newStatus;
+          } else {
+            updateData.personLinkedinPost = newStatus;
+          }
+
+          await db
+            .update(leads)
+            .set(updateData)
+            .where(eq(leads.id, lead.id));
+
           try {
-            await recordScraperRun({
-              runId: run.id,
+            await recordEntityScraperUsage({
+              entityType: "lead",
+              entityId: lead.id,
               scraperId,
-              userId,
+              runId: run.id,
               source: "enrich_collection",
-              collectionId,
-              leadId: lead.id,
-              itemCount: 0,
-              status: runStatus.status,
-              fetchCostFromApify: true,
+              hasResult: urlItems.length > 0,
+              itemCount: urlItems.length,
+              configUsed: { maxPosts: maxPosts || 10, postedDateLimit: postedDateLimit ?? undefined },
+              userId,
             });
           } catch {
             /* ignore */
           }
-          results.errors++;
-          continue;
-        }
-
-        // Récupérer les résultats
-        const items = await adapter.getResults(run.id);
-        if (items.length > 0 && lead.id === leadsToEnrich[0]?.id) {
-          console.log(`[Enrichment Collection] Exemple de résultat pour lead ${lead.id}:`, JSON.stringify(items[0], null, 2));
-        }
-
-        // Mapper et sauvegarder les posts
-        let mappingResult;
-        let newStatus: string;
-
-        if (items.length === 0) {
-          newStatus = "no-posts";
-          mappingResult = { created: 0, skipped: 0, errors: 0 };
-          results.noPosts++;
-        } else {
-          if (mapperType === "linkedin-company-posts") {
-            mappingResult = await mapCompanyPostsToDB(
-              items as LinkedInPostData[],
-              lead.companyId,
-              lead.company?.linkedinUrl!
-            );
-          } else {
-            mappingResult = await mapLeadPostsToDB(
-              items as LinkedInPostData[],
-              lead.id,
-              lead.linkedinUrl!
-            );
-          }
-
-          if (mappingResult.created > 0) {
-            newStatus = "enriched";
-            results.enriched++;
-          } else {
-            newStatus = "no-posts";
-            results.noPosts++;
-          }
-        }
-
-        // Mettre à jour le statut du lead
-        const updateData: Record<string, unknown> = {
-          updatedAt: new Date(),
-        };
-
-        if (mapperType === "linkedin-company-posts") {
-          updateData.companyLinkedinPost = newStatus;
-        } else {
-          updateData.personLinkedinPost = newStatus;
-        }
-
-        await db
-          .update(leads)
-          .set(updateData)
-          .where(eq(leads.id, lead.id));
-
-        try {
-          await recordScraperRun({
-            runId: run.id,
-            scraperId,
-            userId,
-            source: "enrich_collection",
-            collectionId,
-            leadId: lead.id,
-            itemCount: items.length,
-            status: runStatus.status,
-            fetchCostFromApify: true,
-          });
-        } catch {
-          /* ignore */
         }
       } catch (error) {
         console.error(
-          `[Enrichment Collection] Erreur pour lead ${lead.id}:`,
+          `[Enrichment Collection] Erreur pour l'URL ${url}:`,
           error
         );
-        results.errors++;
+        results.errors += leadIds.length;
       }
+    }
+
+    // Traiter les URLs qui n'ont pas eu de résultats
+    for (const url of urlsToScrape) {
+      if (!resultsByUrl[url]) {
+        const leadIds = leadUrlMap[url];
+        results.noPosts += leadIds.length;
+
+        // Mettre à jour le statut des leads sans résultats
+        for (const leadId of leadIds) {
+          const lead = leadsToEnrich.find(l => l.id === leadId);
+          if (!lead) continue;
+
+          const updateData: Record<string, unknown> = {
+            updatedAt: new Date(),
+          };
+
+          if (mapperType === "linkedin-company-posts") {
+            updateData.companyLinkedinPost = "no-posts";
+          } else {
+            updateData.personLinkedinPost = "no-posts";
+          }
+
+          await db
+            .update(leads)
+            .set(updateData)
+            .where(eq(leads.id, lead.id));
+
+          try {
+            await recordEntityScraperUsage({
+              entityType: "lead",
+              entityId: lead.id,
+              scraperId,
+              runId: run.id,
+              source: "enrich_collection",
+              hasResult: false,
+              itemCount: 0,
+              configUsed: { maxPosts: maxPosts || 10, postedDateLimit: postedDateLimit ?? undefined },
+              userId,
+            });
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+    }
+
+    try {
+      await recordScraperRun({
+        runId: run.id,
+        scraperId,
+        userId,
+        source: "enrich_collection",
+        collectionId,
+        itemCount: items.length,
+        status: runStatus.status,
+        fetchCostFromApify: true,
+      });
+    } catch {
+      /* ignore */
     }
 
     const skipped =

@@ -58,12 +58,14 @@ export class BulkEmailFinderAdapter extends ApifyAdapter {
   async mapToLeads(
     data: unknown[],
     collectionId: number,
-    userId: number
+    userId: number,
+    options?: { scraperId?: number; companyLinkedinUrl?: string },
   ): Promise<MappingResult> {
     return mapBulkEmailFinderDataToLeads(
       data as BulkEmailFinderData[],
       collectionId,
-      userId
+      userId,
+      { scraperId: options?.scraperId },
     );
   }
 }

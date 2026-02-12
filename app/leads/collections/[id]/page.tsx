@@ -23,6 +23,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
   Breadcrumb,
@@ -134,11 +142,22 @@ export default function CollectionDetailPage({ params }: Props) {
     position?: string;
     status?: string;
     validated?: string;
+    sourceTypes?: string[];
+    scoreCategory?: string;
   }>({});
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [leadToDelete, setLeadToDelete] = useState<number | null>(null);
   const [deletingLead, setDeletingLead] = useState(false);
   const [verifyingEmails, setVerifyingEmails] = useState(false);
+  const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
+  const [verifyStats, setVerifyStats] = useState<{
+    totalWithEmail: number;
+    verifiedCount: number;
+    unverifiedCount: number;
+    estimatedCostUnverified: number;
+    estimatedCostAll: number;
+  } | null>(null);
+  const [loadingVerifyStats, setLoadingVerifyStats] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -156,6 +175,12 @@ export default function CollectionDetailPage({ params }: Props) {
         const params = new URLSearchParams();
         params.append("page", page.toString());
         params.append("limit", "50");
+        if (filters.sourceTypes?.length) {
+          filters.sourceTypes.forEach((t) => params.append("sourceTypes", t));
+        }
+        if (filters.scoreCategory) {
+          params.append("scoreCategory", filters.scoreCategory);
+        }
 
         const response = await fetch(
           `/api/collections/${id}?${params.toString()}`,
@@ -178,7 +203,7 @@ export default function CollectionDetailPage({ params }: Props) {
         setLoading(false);
       }
     },
-    [status, id, router],
+    [status, id, router, filters.sourceTypes, filters.scoreCategory],
   );
 
   useEffect(() => {
@@ -242,20 +267,52 @@ export default function CollectionDetailPage({ params }: Props) {
     setDeleteDialogOpen(true);
   };
 
-  const handleVerifyEmails = async () => {
+  const handleOpenVerifyDialog = async () => {
+    setVerifyDialogOpen(true);
+    setLoadingVerifyStats(true);
+    setVerifyStats(null);
+    try {
+      const response = await fetch(
+        `/api/collections/${id}/verify-emails-apify`,
+      );
+      const data = await response.json();
+      if (response.ok) {
+        setVerifyStats({
+          totalWithEmail: data.totalWithEmail ?? 0,
+          verifiedCount: data.verifiedCount ?? 0,
+          unverifiedCount: data.unverifiedCount ?? 0,
+          estimatedCostUnverified:
+            (data.unverifiedCount ?? 0) * (data.costPerLead ?? 0.001),
+          estimatedCostAll:
+            (data.totalWithEmail ?? 0) * (data.costPerLead ?? 0.001),
+        });
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement des stats:", error);
+      toast.error("Erreur lors du chargement des statistiques");
+    } finally {
+      setLoadingVerifyStats(false);
+    }
+  };
+
+  const handleVerifyEmails = async (force: boolean) => {
+    setVerifyDialogOpen(false);
     setVerifyingEmails(true);
     try {
-      const response = await fetch(`/api/collections/${id}/verify-emails`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ force: false }),
-      });
+      const response = await fetch(
+        `/api/collections/${id}/verify-emails-apify`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ force }),
+        },
+      );
       const data = await response.json();
 
       if (response.ok) {
         const m = data.metrics || {};
         toast.success(
-          `Vérification terminée : ${m.updated ?? 0} emails vérifiés (${m.ok ?? 0} délivrables, ${m.invalid ?? 0} invalides, ${m.unknown ?? 0} inconnus)`
+          `Vérification terminée : ${m.enriched ?? 0} emails vérifiés${m.estimatedCostUsd != null ? ` (~$${m.estimatedCostUsd})` : ""}`,
         );
         fetchCollectionData(currentPage);
       } else {
@@ -464,7 +521,7 @@ export default function CollectionDetailPage({ params }: Props) {
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
-                  onClick={handleVerifyEmails}
+                  onClick={handleOpenVerifyDialog}
                   disabled={
                     verifyingEmails ||
                     collectionData.leads.pagination.totalItems === 0
@@ -579,6 +636,68 @@ export default function CollectionDetailPage({ params }: Props) {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Dialog de vérification des emails */}
+        <Dialog open={verifyDialogOpen} onOpenChange={setVerifyDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Vérifier les emails</DialogTitle>
+              <DialogDescription>
+                {loadingVerifyStats ? (
+                  "Chargement des statistiques..."
+                ) : verifyStats ? (
+                  <>
+                    {verifyStats.totalWithEmail === 0 ? (
+                      <span>Aucun lead avec email dans cette collection.</span>
+                    ) : (
+                      <>
+                        <span className="block mb-2">
+                          {verifyStats.verifiedCount} lead
+                          {verifyStats.verifiedCount !== 1 ? "s" : ""} déjà
+                          vérifié
+                          {verifyStats.verifiedCount !== 1 ? "s" : ""},{" "}
+                          {verifyStats.unverifiedCount} non vérifié
+                          {verifyStats.unverifiedCount !== 1 ? "s" : ""}.
+                        </span>
+                        <span className="block text-sm">
+                          Choisissez quels emails vérifier (~$0.001 par email).
+                        </span>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  "Erreur lors du chargement."
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            {verifyStats && verifyStats.totalWithEmail > 0 && (
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                {verifyStats.unverifiedCount > 0 && (
+                  <Button
+                    onClick={() => handleVerifyEmails(false)}
+                    disabled={verifyingEmails}
+                    className="w-full sm:w-auto"
+                  >
+                    <ShieldCheck className="h-4 w-4 mr-2" />
+                    Vérifier uniquement les {verifyStats.unverifiedCount} non
+                    vérifiés (~$
+                    {verifyStats.estimatedCostUnverified.toFixed(2)})
+                  </Button>
+                )}
+                <Button
+                  variant={verifyStats.unverifiedCount > 0 ? "outline" : "default"}
+                  onClick={() => handleVerifyEmails(true)}
+                  disabled={verifyingEmails}
+                  className="w-full sm:w-auto"
+                >
+                  <ShieldCheck className="h-4 w-4 mr-2" />
+                  Vérifier tous les {verifyStats.totalWithEmail} (~$
+                  {verifyStats.estimatedCostAll.toFixed(2)})
+                </Button>
+              </DialogFooter>
+            )}
+          </DialogContent>
+        </Dialog>
       </SidebarInset>
     </SidebarProvider>
   );

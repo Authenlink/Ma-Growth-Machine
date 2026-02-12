@@ -55,11 +55,18 @@ export interface ScraperAdapter {
    * @param data Données brutes du scraper
    * @param collectionId ID de la collection où sauvegarder les leads
    * @param userId ID de l'utilisateur propriétaire
+   * @param options Options optionnelles (scraperId, companyLinkedinUrl, emailToLeadId, runId)
    * @returns Résultat du mapping (créés, ignorés, erreurs)
    */
   mapToLeads(
     data: unknown[],
     collectionId: number,
-    userId: number
+    userId: number,
+    options?: {
+      scraperId?: number;
+      companyLinkedinUrl?: string;
+      emailToLeadId?: Map<string, number>;
+      runId?: string;
+    },
   ): Promise<MappingResult>;
 }

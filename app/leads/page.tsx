@@ -105,6 +105,8 @@ export default function LeadsPage() {
     position?: string;
     status?: string;
     validated?: string;
+    sourceTypes?: string[];
+    scoreCategory?: string;
   }>({});
 
   useEffect(() => {
@@ -167,7 +169,9 @@ export default function LeadsPage() {
     try {
       const params = new URLSearchParams();
       Object.entries(filters).forEach(([key, value]) => {
-        if (value) {
+        if (Array.isArray(value)) {
+          value.forEach((v) => params.append(key, v));
+        } else if (value) {
           params.append(key, value);
         }
       });

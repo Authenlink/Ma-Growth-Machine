@@ -1,8 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { leads, companies, collections, leadCollections } from "@/lib/schema";
-import { eq, and, or, like, desc, sql, inArray } from "drizzle-orm";
+import {
+  leads,
+  companies,
+  collections,
+  leadCollections,
+  entityScraperUsages,
+  scrapers,
+  trustpilotReviews,
+} from "@/lib/schema";
+import { eq, and, or, like, desc, sql, inArray, exists, isNotNull, ne } from "drizzle-orm";
+import {
+  FILTERABLE_SOURCE_TYPES,
+  SOURCE_ENTITY_TYPE,
+  SOURCE_USE_ENTITY_SCRAPER_USAGES,
+} from "@/lib/source-types";
+import {
+  FILTERABLE_SCORE_CATEGORIES,
+  getScoreCategory,
+  type ScoreCategory,
+} from "@/lib/score-types";
+import {
+  buildLeadScoreSqlExpression,
+  buildLeadScoreCategoryCondition,
+} from "@/lib/lead-scoring";
 
 // GET /api/leads - Liste tous les leads de l'utilisateur avec filtres
 export async function GET(request: NextRequest) {
@@ -29,6 +51,16 @@ export async function GET(request: NextRequest) {
     const position = searchParams.get("position");
     const status = searchParams.get("status");
     const validated = searchParams.get("validated");
+    const sourceTypesRaw = searchParams.getAll("sourceTypes");
+    const sourceTypes = sourceTypesRaw
+      .flatMap((s) => s.split(",").map((t) => t.trim()))
+      .filter((t) => t && FILTERABLE_SOURCE_TYPES.includes(t));
+
+    const scoreCategoryRaw = searchParams.get("scoreCategory");
+    const scoreCategory: ScoreCategory | null =
+      scoreCategoryRaw && FILTERABLE_SCORE_CATEGORIES.includes(scoreCategoryRaw as ScoreCategory)
+        ? (scoreCategoryRaw as ScoreCategory)
+        : null;
 
     // Paramètres de pagination
     const page = parseInt(searchParams.get("page") || "1");
@@ -85,6 +117,49 @@ export async function GET(request: NextRequest) {
       companyNameCondition = sql`${companies.name} ILIKE ${companyNamePattern}`;
     }
 
+    // Filtre par sources (enrichissements) - AND : le lead doit avoir la source pour chaque mapperType
+    const sourceTypeConditions = sourceTypes.map((mapperType) => {
+      if (SOURCE_USE_ENTITY_SCRAPER_USAGES[mapperType] !== false) {
+        const entityType =
+          SOURCE_ENTITY_TYPE[mapperType] ?? "lead";
+        const entityIdColumn =
+          entityType === "company" ? leads.companyId : leads.id;
+        return exists(
+          db
+            .select()
+            .from(entityScraperUsages)
+            .innerJoin(
+              scrapers,
+              eq(entityScraperUsages.scraperId, scrapers.id)
+            )
+            .where(
+              and(
+                eq(entityScraperUsages.entityType, entityType),
+                eq(entityScraperUsages.entityId, entityIdColumn),
+                eq(entityScraperUsages.hasResult, true),
+                eq(entityScraperUsages.userId, userId),
+                eq(scrapers.mapperType, mapperType)
+              )
+            )
+        );
+      }
+      if (mapperType === "trustpilot-reviews") {
+        return exists(
+          db
+            .select()
+            .from(trustpilotReviews)
+            .where(eq(trustpilotReviews.companyId, leads.companyId))
+        );
+      }
+      if (mapperType === "email-verify") {
+        return and(
+          isNotNull(leads.emailVerifyEmaillist),
+          ne(leads.emailVerifyEmaillist, "")
+        )!;
+      }
+      return sql`true`;
+    });
+
     // Construire la condition where finale
     const whereConditions = [];
     if (conditions.length > 0) {
@@ -92,6 +167,13 @@ export async function GET(request: NextRequest) {
     }
     if (companyNameCondition) {
       whereConditions.push(companyNameCondition);
+    }
+    if (sourceTypeConditions.length > 0) {
+      whereConditions.push(and(...sourceTypeConditions)!);
+    }
+
+    if (scoreCategory) {
+      whereConditions.push(buildLeadScoreCategoryCondition(scoreCategory));
     }
 
     const finalWhereCondition = whereConditions.length > 0
@@ -141,6 +223,7 @@ export async function GET(request: NextRequest) {
         lastName: leads.lastName,
         position: leads.position,
         email: leads.email,
+        emailCertainty: leads.emailCertainty,
         emailVerifyEmaillist: leads.emailVerifyEmaillist,
         linkedinUrl: leads.linkedinUrl,
         seniority: leads.seniority,
@@ -151,6 +234,7 @@ export async function GET(request: NextRequest) {
         state: leads.state,
         country: leads.country,
         createdAt: leads.createdAt,
+        score: buildLeadScoreSqlExpression(),
         company: {
           id: companies.id,
           name: companies.name,
@@ -217,14 +301,19 @@ export async function GET(request: NextRequest) {
       collectionsByLead.set(lc.leadId, list);
     }
 
-    const resultsWithCollections = results.map((lead) => ({
-      ...lead,
-      collections: collectionsByLead.get(lead.id) ?? [],
-      collection: (() => {
-        const cols = collectionsByLead.get(lead.id);
-        return cols && cols.length > 0 ? cols[0] : null;
-      })(),
-    }));
+    const resultsWithCollections = results.map((lead) => {
+      const score = typeof lead.score === "number" ? lead.score : 0;
+      return {
+        ...lead,
+        score,
+        scoreCategory: getScoreCategory(score),
+        collections: collectionsByLead.get(lead.id) ?? [],
+        collection: (() => {
+          const cols = collectionsByLead.get(lead.id);
+          return cols && cols.length > 0 ? cols[0] : null;
+        })(),
+      };
+    });
 
     return NextResponse.json({
       data: resultsWithCollections,

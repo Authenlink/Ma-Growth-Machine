@@ -90,11 +90,11 @@ export function ScrapersTableView({ scrapers }: ScrapersTableViewProps) {
 
   const headerCellClass =
     "h-10 px-3 text-left align-middle font-medium text-xs border-r border-border last:border-r-0 sticky top-0 bg-muted z-[2] whitespace-nowrap";
-  const stickyHeaderClass = `${headerCellClass} left-0 z-[3] min-w-[180px] max-w-[220px] border-r border-border shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]`;
+  const stickyHeaderClass = `${headerCellClass} left-0 z-[3] min-w-[180px] max-w-[220px] border-r border-border shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] bg-muted`;
   const cellClass =
     "px-3 py-2.5 align-middle text-sm border-r border-border last:border-r-0";
   const getStickyCellClass = (isEvenRow: boolean) =>
-    `${cellClass} sticky left-0 z-[1] min-w-[180px] max-w-[220px] border-r border-border shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] ${isEvenRow ? "bg-muted/50" : "bg-background"}`;
+    `${cellClass} sticky left-0 z-[1] min-w-[180px] max-w-[220px] border-r border-border shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] ${isEvenRow ? "bg-muted" : "bg-background"}`;
 
   return (
     <div className="w-full min-w-0 rounded-md border max-h-[calc(100vh-250px)] overflow-auto">
@@ -135,12 +135,12 @@ export function ScrapersTableView({ scrapers }: ScrapersTableViewProps) {
                   key={scraper.id}
                   className="border-b border-border transition-colors hover:bg-muted/50 cursor-pointer even:bg-muted/30"
                   onClick={() => {
-                  if (scraper.mapperType === "pagespeed-seo") {
-                    router.push("/enrichment/seo");
-                  } else {
-                    router.push(`/leads/scrape/${scraper.id}`);
-                  }
-                }}
+                    if (scraper.mapperType === "pagespeed-seo") {
+                      router.push("/enrichment/seo");
+                    } else {
+                      router.push(`/leads/scrape/${scraper.id}`);
+                    }
+                  }}
                 >
                   {/* Nom (sticky) */}
                   <td className={getStickyCellClass(index % 2 === 1)}>

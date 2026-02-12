@@ -12,16 +12,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { SourcesFilterDropdown } from "@/components/sources-filter-dropdown";
+import { ScoreFilterDropdown } from "@/components/score-filter-dropdown";
 
 interface Collection {
   id: number;
   name: string;
+  folderId?: number | null;
   folderName?: string | null;
   isDefault?: boolean;
 }
@@ -44,6 +42,8 @@ interface LeadsFiltersProps {
     position?: string;
     status?: string;
     validated?: string;
+    sourceTypes?: string[];
+    scoreCategory?: string;
   };
   onFiltersChange: (filters: LeadsFiltersProps["filters"]) => void;
   resultCount?: number;
@@ -65,12 +65,35 @@ export function LeadsFilters({
   }, [filters]);
 
   const handleFilterChange = (key: string, value: string | undefined) => {
+    if (key === "sourceTypes" || key === "scoreCategory") return;
     const newFilters = { ...localFilters };
     // "all" est utilisé pour représenter "tous" / valeur vide
     if (value === "all" || value === "" || value === undefined) {
       delete newFilters[key as keyof typeof newFilters];
     } else {
-      newFilters[key as keyof typeof newFilters] = value;
+      (newFilters as Record<string, string | undefined>)[key] = value;
+    }
+    setLocalFilters(newFilters);
+    onFiltersChange(newFilters);
+  };
+
+  const handleSourceTypesChange = (sourceTypes: string[]) => {
+    const newFilters = { ...localFilters };
+    if (sourceTypes.length === 0) {
+      delete newFilters.sourceTypes;
+    } else {
+      newFilters.sourceTypes = sourceTypes;
+    }
+    setLocalFilters(newFilters);
+    onFiltersChange(newFilters);
+  };
+
+  const handleScoreCategoryChange = (scoreCategory: string | undefined) => {
+    const newFilters = { ...localFilters };
+    if (!scoreCategory) {
+      delete newFilters.scoreCategory;
+    } else {
+      newFilters.scoreCategory = scoreCategory;
     }
     setLocalFilters(newFilters);
     onFiltersChange(newFilters);
@@ -82,51 +105,138 @@ export function LeadsFilters({
     onFiltersChange(emptyFilters);
   };
 
-  const hasActiveFilters = Object.keys(filters).length > 0;
+  const hasActiveFilters =
+    Object.keys(filters).length > 0 ||
+    (filters.sourceTypes?.length ?? 0) > 0 ||
+    !!filters.scoreCategory;
+
+  // Collections filtrées par dossier sélectionné
+  const selectedFolderId = localFilters.folderId
+    ? parseInt(localFilters.folderId)
+    : null;
+  const filteredCollections =
+    selectedFolderId && !isNaN(selectedFolderId)
+      ? collections.filter(
+          (c) => c.folderId !== null && c.folderId === selectedFolderId
+        )
+      : collections;
+
+  const handleFolderChange = (value: string) => {
+    const newFilters = { ...localFilters };
+    if (value === "all" || value === "") {
+      delete newFilters.folderId;
+      delete newFilters.collectionId; // Réinitialiser la collection si on change de dossier
+    } else {
+      newFilters.folderId = value;
+      delete newFilters.collectionId; // Réinitialiser car les collections changent
+    }
+    setLocalFilters(newFilters);
+    onFiltersChange(newFilters);
+  };
 
   return (
     <div className="space-y-4">
-      {/* Filtres principaux */}
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="flex-1 min-w-[200px]">
-          <Label htmlFor="filter-company-name" className="text-xs mb-1.5 block">
-            Nom d&apos;entreprise
-          </Label>
-          <Input
-            id="filter-company-name"
-            placeholder="Rechercher une entreprise..."
-            value={localFilters.companyName || ""}
-            onChange={(e) =>
-              handleFilterChange("companyName", e.target.value || undefined)
-            }
-          />
-        </div>
+      {/* Filtres principaux : Dossier, Collection, Nom entreprise, Nom lead */}
+      <div className="rounded-xl border border-border/80 bg-card/30 p-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-[180px]">
+            <Label htmlFor="filter-folder" className="text-xs font-medium mb-1.5 block">
+              Dossier
+            </Label>
+            <Select
+              value={localFilters.folderId || "all"}
+              onValueChange={handleFolderChange}
+            >
+              <SelectTrigger id="filter-folder">
+                <SelectValue placeholder="Tous les dossiers" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les dossiers</SelectItem>
+                {folders.map((folder) => (
+                  <SelectItem key={folder.id} value={folder.id.toString()}>
+                    {folder.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-        <div className="flex-1 min-w-[200px]">
-          <Label htmlFor="filter-lead-name" className="text-xs mb-1.5 block">
-            Nom du lead
-          </Label>
-          <Input
-            id="filter-lead-name"
-            placeholder="Rechercher un lead..."
-            value={localFilters.leadName || ""}
-            onChange={(e) =>
-              handleFilterChange("leadName", e.target.value || undefined)
-            }
-          />
-        </div>
+          <div className="min-w-[180px]">
+            <Label htmlFor="filter-collection" className="text-xs font-medium mb-1.5 block">
+              Collection
+            </Label>
+            <Select
+              value={
+                localFilters.collectionId &&
+                filteredCollections.some(
+                  (c) => c.id.toString() === localFilters.collectionId
+                )
+                  ? localFilters.collectionId
+                  : "all"
+              }
+              onValueChange={(value) =>
+                handleFilterChange("collectionId", value)
+              }
+            >
+              <SelectTrigger id="filter-collection">
+                <SelectValue placeholder="Toutes les collections" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes les collections</SelectItem>
+                {filteredCollections.map((collection) => (
+                  <SelectItem
+                    key={collection.id}
+                    value={collection.id.toString()}
+                  >
+                    {collection.folderName
+                      ? `${collection.name} (${collection.folderName})${collection.isDefault ? " — par défaut" : ""}`
+                      : `${collection.name}${collection.isDefault ? " — par défaut" : ""}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-        {hasActiveFilters && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleResetFilters}
-            className="gap-2"
-          >
-            <X className="h-4 w-4" />
-            Réinitialiser
-          </Button>
-        )}
+          <div className="flex-1 min-w-[200px]">
+            <Label htmlFor="filter-company-name" className="text-xs font-medium mb-1.5 block">
+              Nom d&apos;entreprise
+            </Label>
+            <Input
+              id="filter-company-name"
+              placeholder="Rechercher une entreprise..."
+              value={localFilters.companyName || ""}
+              onChange={(e) =>
+                handleFilterChange("companyName", e.target.value || undefined)
+              }
+            />
+          </div>
+
+          <div className="flex-1 min-w-[200px]">
+            <Label htmlFor="filter-lead-name" className="text-xs font-medium mb-1.5 block">
+              Nom du lead
+            </Label>
+            <Input
+              id="filter-lead-name"
+              placeholder="Rechercher un lead..."
+              value={localFilters.leadName || ""}
+              onChange={(e) =>
+                handleFilterChange("leadName", e.target.value || undefined)
+              }
+            />
+          </div>
+
+          {hasActiveFilters && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleResetFilters}
+              className="gap-2"
+            >
+              <X className="h-4 w-4" />
+              Réinitialiser
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Compteur de résultats */}
@@ -137,10 +247,15 @@ export function LeadsFilters({
         </div>
       )}
 
-      {/* Filtres avancés */}
-      <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
-        <CollapsibleTrigger asChild>
-          <Button variant="ghost" size="sm" className="gap-2">
+      {/* Filtres avancés, Sources et Note */}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-2 border border-border/80"
+            onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
+          >
             <Filter className="h-4 w-4" />
             Filtres avancés
             {isAdvancedOpen ? (
@@ -149,59 +264,19 @@ export function LeadsFilters({
               <ChevronDown className="h-4 w-4" />
             )}
           </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="mt-4">
-          <div className="rounded-lg border bg-card p-4">
-            <FieldGroup className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <Field>
-                <FieldLabel htmlFor="filter-folder">Dossier</FieldLabel>
-                <Select
-                  value={localFilters.folderId || "all"}
-                  onValueChange={(value) =>
-                    handleFilterChange("folderId", value)
-                  }
-                >
-                  <SelectTrigger id="filter-folder">
-                    <SelectValue placeholder="Tous les dossiers" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tous les dossiers</SelectItem>
-                    {folders.map((folder) => (
-                      <SelectItem key={folder.id} value={folder.id.toString()}>
-                        {folder.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-
-              <Field>
-                <FieldLabel htmlFor="filter-collection">Collection</FieldLabel>
-                <Select
-                  value={localFilters.collectionId || "all"}
-                  onValueChange={(value) =>
-                    handleFilterChange("collectionId", value)
-                  }
-                >
-                  <SelectTrigger id="filter-collection">
-                    <SelectValue placeholder="Toutes les collections" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Toutes les collections</SelectItem>
-                    {collections.map((collection) => (
-                      <SelectItem
-                        key={collection.id}
-                        value={collection.id.toString()}
-                      >
-                        {collection.folderName
-                          ? `${collection.name} (${collection.folderName})${collection.isDefault ? " — par défaut" : ""}`
-                          : `${collection.name}${collection.isDefault ? " — par défaut" : ""}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-
+          <SourcesFilterDropdown
+            selectedSourceTypes={filters.sourceTypes ?? []}
+            onChange={handleSourceTypesChange}
+          />
+          <ScoreFilterDropdown
+            entityType="lead"
+            selectedCategory={filters.scoreCategory}
+            onChange={handleScoreCategoryChange}
+          />
+        </div>
+        {isAdvancedOpen && (
+          <div className="rounded-xl border border-border/80 bg-card/30 p-4 w-full">
+              <FieldGroup className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <Field>
                 <FieldLabel htmlFor="filter-seniority">Seniority</FieldLabel>
                 <Input
@@ -281,8 +356,8 @@ export function LeadsFilters({
               </Field>
             </FieldGroup>
           </div>
-        </CollapsibleContent>
-      </Collapsible>
+        )}
+      </div>
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { LinkedInProfilePostsAdapter } from "./adapters/linkedin-profile-posts-a
 import { LinkedInCompanyEmployeesAdapter } from "./adapters/linkedin-company-employees-adapter";
 import { BulkEmailFinderAdapter } from "./adapters/bulk-email-finder-adapter";
 import { LeadsFinderAdapter } from "./adapters/leads-finder-adapter";
+import { EasyBulkEmailValidatorAdapter } from "./adapters/easy-bulk-email-validator-adapter";
 
 /**
  * Factory pour créer les adapters de scrapers selon leur type
@@ -35,9 +36,12 @@ export function getAdapter(
     case "leads-finder":
       return new LeadsFinderAdapter(apifyConfig);
 
+    case "easy-bulk-email-validator":
+      return new EasyBulkEmailValidatorAdapter(apifyConfig);
+
     default:
       throw new Error(
-        `Type de mapper non supporté: ${mapperType}. Types supportés: apify, linkedin-company-posts, linkedin-profile-posts, linkedin-company-employees, bulk-email-finder, leads-finder`
+        `Type de mapper non supporté: ${mapperType}. Types supportés: apify, linkedin-company-posts, linkedin-profile-posts, linkedin-company-employees, bulk-email-finder, leads-finder, easy-bulk-email-validator`
       );
   }
 }

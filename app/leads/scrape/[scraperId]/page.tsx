@@ -29,7 +29,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useScroll } from "@/hooks/use-scroll";
-import { Loader2, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import {
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  ShieldCheck,
+} from "lucide-react";
 import { ScraperForm } from "@/components/scraper-form";
 import { CostEstimation } from "@/components/scraper-fields/cost-estimation";
 import {
@@ -44,6 +50,14 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface Collection {
   id: number;
@@ -100,7 +114,8 @@ interface Scraper {
         | "text"
         | "collection"
         | "company"
-        | "leads";
+        | "leads"
+        | "folder_collection";
       label: string;
       [key: string]: unknown;
     }>;
@@ -166,6 +181,18 @@ export default function ScraperFormPage() {
 
   // Scraping state
   const [isScraping, setIsScraping] = useState(false);
+  const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
+  const [verifyDialogCollectionId, setVerifyDialogCollectionId] = useState<
+    number | null
+  >(null);
+  const [verifyStats, setVerifyStats] = useState<{
+    totalWithEmail: number;
+    verifiedCount: number;
+    unverifiedCount: number;
+    estimatedCostUnverified: number;
+    estimatedCostAll: number;
+  } | null>(null);
+  const [loadingVerifyStats, setLoadingVerifyStats] = useState(false);
   const [scrapingStatus, setScrapingStatus] = useState<
     "idle" | "running" | "success" | "error"
   >("idle");
@@ -461,6 +488,42 @@ export default function ScraperFormPage() {
       return;
     }
 
+    // If Easy Bulk Email Validator (Apify) scraper, ouvrir le dialog de choix
+    if (scraper?.mapperType === "easy-bulk-email-validator") {
+      const collectionId = formData.collectionId as number | undefined;
+      if (!collectionId || typeof collectionId !== "number") {
+        toast.error("Veuillez sélectionner une collection");
+        return;
+      }
+      setVerifyDialogCollectionId(collectionId);
+      setVerifyDialogOpen(true);
+      setVerifyStats(null);
+      setLoadingVerifyStats(true);
+      try {
+        const response = await fetch(
+          `/api/collections/${collectionId}/verify-emails-apify`,
+        );
+        const data = await response.json();
+        if (response.ok) {
+          setVerifyStats({
+            totalWithEmail: data.totalWithEmail ?? 0,
+            verifiedCount: data.verifiedCount ?? 0,
+            unverifiedCount: data.unverifiedCount ?? 0,
+            estimatedCostUnverified:
+              (data.unverifiedCount ?? 0) * (data.costPerLead ?? 0.001),
+            estimatedCostAll:
+              (data.totalWithEmail ?? 0) * (data.costPerLead ?? 0.001),
+          });
+        }
+      } catch (error) {
+        console.error("Erreur:", error);
+        toast.error("Erreur lors du chargement des statistiques");
+      } finally {
+        setLoadingVerifyStats(false);
+      }
+      return;
+    }
+
     const collectionId = formData.collectionId;
     if (!collectionId || typeof collectionId !== "number") {
       toast.error("Veuillez sélectionner une collection");
@@ -511,6 +574,53 @@ export default function ScraperFormPage() {
       setScrapingStatus("error");
       setErrorMessage("Erreur de connexion lors du scraping");
       toast.error("Erreur de connexion lors du scraping");
+    } finally {
+      setIsScraping(false);
+    }
+  };
+
+  const handleVerifyEmailsApify = async (force: boolean) => {
+    const collectionId = verifyDialogCollectionId;
+    if (!collectionId) return;
+
+    setVerifyDialogOpen(false);
+    setVerifyDialogCollectionId(null);
+    setIsScraping(true);
+    setScrapingStatus("running");
+    setScrapingMetrics(null);
+    setErrorMessage(null);
+    try {
+      const response = await fetch(
+        `/api/collections/${collectionId}/verify-emails-apify`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ force }),
+        },
+      );
+      const data = await response.json();
+      if (response.ok) {
+        setScrapingStatus("success");
+        const m = data.metrics || {};
+        setScrapingMetrics({
+          totalFound: m.total ?? m.processed ?? 0,
+          created: m.enriched ?? 0,
+          skipped: m.skipped ?? 0,
+          errors: m.errors ?? 0,
+        });
+        toast.success(
+          `Vérification terminée : ${m.enriched ?? 0} emails vérifiés${m.estimatedCostUsd != null ? ` (~$${m.estimatedCostUsd})` : ""}`,
+        );
+      } else {
+        setScrapingStatus("error");
+        setErrorMessage(data.error || "Erreur lors de la vérification");
+        toast.error(data.error || "Erreur lors de la vérification");
+      }
+    } catch (error) {
+      console.error("Erreur:", error);
+      setScrapingStatus("error");
+      setErrorMessage("Erreur de connexion");
+      toast.error("Erreur de connexion lors de la vérification");
     } finally {
       setIsScraping(false);
     }
@@ -1093,10 +1203,16 @@ export default function ScraperFormPage() {
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       {isEnrichmentScraper
                         ? "Enrichissement en cours..."
-                        : "Scraping en cours..."}
+                        : scraper?.mapperType === "email-verify" ||
+                            scraper?.mapperType === "easy-bulk-email-validator"
+                          ? "Vérification en cours..."
+                          : "Scraping en cours..."}
                     </>
                   ) : isEnrichmentScraper ? (
                     "Lancer l'enrichissement"
+                  ) : scraper?.mapperType === "email-verify" ||
+                      scraper?.mapperType === "easy-bulk-email-validator" ? (
+                    "Lancer la vérification"
                   ) : (
                     "Lancer le scraping"
                   )}
@@ -1166,12 +1282,13 @@ export default function ScraperFormPage() {
                     </div>
                   )}
 
-                  {scrapingStatus === "success" && scrapingMetrics && (
+                    {scrapingStatus === "success" && scrapingMetrics && (
                     <div className="space-y-4">
                       <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
                         <CheckCircle2 className="h-5 w-5" />
                         <span className="font-medium">
-                          {scraper?.mapperType === "email-verify"
+                          {(scraper?.mapperType === "email-verify" ||
+                            scraper?.mapperType === "easy-bulk-email-validator")
                             ? "Vérification"
                             : isEnrichmentScraper
                               ? "Enrichissement"
@@ -1182,7 +1299,8 @@ export default function ScraperFormPage() {
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">
-                            {scraper?.mapperType === "email-verify"
+                            {(scraper?.mapperType === "email-verify" ||
+                              scraper?.mapperType === "easy-bulk-email-validator")
                               ? "Total vérifiés:"
                               : "Total trouvé:"}
                           </span>
@@ -1192,7 +1310,8 @@ export default function ScraperFormPage() {
                         </div>
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">
-                            {scraper?.mapperType === "email-verify"
+                            {(scraper?.mapperType === "email-verify" ||
+                              scraper?.mapperType === "easy-bulk-email-validator")
                               ? "Délivrables (ok):"
                               : "Créés:"}
                           </span>
@@ -1202,7 +1321,8 @@ export default function ScraperFormPage() {
                         </div>
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">
-                            {scraper?.mapperType === "email-verify"
+                            {(scraper?.mapperType === "email-verify" ||
+                              scraper?.mapperType === "easy-bulk-email-validator")
                               ? "Inconnus:"
                               : "Ignorés (doublons):"}
                           </span>
@@ -1211,10 +1331,12 @@ export default function ScraperFormPage() {
                           </span>
                         </div>
                         {(scrapingMetrics.errors > 0 ||
-                          scraper?.mapperType === "email-verify") && (
+                          scraper?.mapperType === "email-verify" ||
+                          scraper?.mapperType === "easy-bulk-email-validator") && (
                           <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">
-                              {scraper?.mapperType === "email-verify"
+                              {(scraper?.mapperType === "email-verify" ||
+                                scraper?.mapperType === "easy-bulk-email-validator")
                                 ? "Invalides:"
                                 : "Erreurs:"}
                             </span>
@@ -1260,6 +1382,70 @@ export default function ScraperFormPage() {
             </div>
           </div>
 
+          {/* Dialog de vérification des emails (Easy Bulk Email Validator) */}
+          <Dialog open={verifyDialogOpen} onOpenChange={setVerifyDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Vérifier les emails</DialogTitle>
+                <DialogDescription>
+                  {loadingVerifyStats ? (
+                    "Chargement des statistiques..."
+                  ) : verifyStats ? (
+                    <>
+                      {verifyStats.totalWithEmail === 0 ? (
+                        <span>Aucun lead avec email dans cette collection.</span>
+                      ) : (
+                        <>
+                          <span className="block mb-2">
+                            {verifyStats.verifiedCount} lead
+                            {verifyStats.verifiedCount !== 1 ? "s" : ""} déjà
+                            vérifié
+                            {verifyStats.verifiedCount !== 1 ? "s" : ""},{" "}
+                            {verifyStats.unverifiedCount} non vérifié
+                            {verifyStats.unverifiedCount !== 1 ? "s" : ""}.
+                          </span>
+                          <span className="block text-sm">
+                            Choisissez quels emails vérifier (~$0.001 par
+                            email).
+                          </span>
+                        </>
+                      )}
+                    </>
+                  ) : (
+                    "Erreur lors du chargement."
+                  )}
+                </DialogDescription>
+              </DialogHeader>
+              {verifyStats && verifyStats.totalWithEmail > 0 && (
+                <DialogFooter className="flex-col sm:flex-row gap-2">
+                  {verifyStats.unverifiedCount > 0 && (
+                    <Button
+                      onClick={() => handleVerifyEmailsApify(false)}
+                      disabled={isScraping}
+                      className="w-full sm:w-auto"
+                    >
+                      <ShieldCheck className="h-4 w-4 mr-2" />
+                      Vérifier uniquement les {verifyStats.unverifiedCount} non
+                      vérifiés (~$
+                      {verifyStats.estimatedCostUnverified.toFixed(2)})
+                    </Button>
+                  )}
+                  <Button
+                    variant={
+                      verifyStats.unverifiedCount > 0 ? "outline" : "default"
+                    }
+                    onClick={() => handleVerifyEmailsApify(true)}
+                    disabled={isScraping}
+                    className="w-full sm:w-auto"
+                  >
+                    <ShieldCheck className="h-4 w-4 mr-2" />
+                    Vérifier tous les {verifyStats.totalWithEmail} (~$
+                    {verifyStats.estimatedCostAll.toFixed(2)})
+                  </Button>
+                </DialogFooter>
+              )}
+            </DialogContent>
+          </Dialog>
         </div>
       </SidebarInset>
     </SidebarProvider>

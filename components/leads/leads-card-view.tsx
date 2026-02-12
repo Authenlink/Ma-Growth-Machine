@@ -194,9 +194,9 @@ export function LeadsCardView({ leads, onDeleteLead }: LeadsCardViewProps) {
                         {lead.emailVerifyEmaillist && (
                           <Badge
                             variant={
-                              ["ok", "ok_for_all"].includes(lead.emailVerifyEmaillist)
+                              ["ok", "ok_for_all", "valid"].includes(lead.emailVerifyEmaillist)
                                 ? "success"
-                                : ["email_disabled", "dead_server", "invalid_mx", "disposable", "spamtrap"].includes(
+                                : ["invalid", "email_disabled", "dead_server", "invalid_mx", "disposable", "spamtrap", "invalid_syntax"].includes(
                                     lead.emailVerifyEmaillist
                                   )
                                   ? "destructive"
@@ -204,9 +204,9 @@ export function LeadsCardView({ leads, onDeleteLead }: LeadsCardViewProps) {
                             }
                             className="text-[10px] px-1.5 py-0"
                           >
-                            {lead.emailVerifyEmaillist === "ok"
+                            {lead.emailVerifyEmaillist === "ok" || lead.emailVerifyEmaillist === "valid"
                               ? "OK"
-                              : lead.emailVerifyEmaillist === "email_disabled"
+                              : lead.emailVerifyEmaillist === "invalid" || lead.emailVerifyEmaillist === "email_disabled"
                                 ? "Invalide"
                                 : lead.emailVerifyEmaillist}
                           </Badge>

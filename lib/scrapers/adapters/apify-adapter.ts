@@ -201,12 +201,14 @@ export class ApifyAdapter implements ScraperAdapter {
   async mapToLeads(
     data: unknown[],
     collectionId: number,
-    userId: number
+    userId: number,
+    options?: { scraperId?: number; companyLinkedinUrl?: string },
   ): Promise<MappingResult> {
     return mapApifyDataToLeads(
       data as ApifyLeadData[],
       collectionId,
-      userId
+      userId,
+      { scraperId: options?.scraperId },
     );
   }
 }

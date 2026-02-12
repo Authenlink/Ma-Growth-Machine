@@ -1277,6 +1277,102 @@ async function seedScrapers() {
       console.log("✅ Scraper EmailListVerify inséré");
     }
 
+    // Easy Bulk Email Validator (Apify) - Vérification des emails via MillionVerifier
+    const easyBulkEmailValidatorFormConfig = {
+      fields: [
+        {
+          id: "folder_collection",
+          type: "folder_collection" as const,
+          label: "Collection",
+          required: true,
+          helpText:
+            "Sélectionnez une collection dont vous souhaitez vérifier les emails via Apify (~$1/1000 emails).",
+        },
+      ],
+      sections: [
+        {
+          title: "Collection",
+          description:
+            "Sélectionnez une collection pour vérifier la délivrabilité des emails de tous les leads qui ont un email.",
+          fields: ["folder_collection"],
+        },
+      ],
+    };
+
+    const existingEasyBulkEmailValidator = await db
+      .select()
+      .from(scrapers)
+      .where(eq(scrapers.mapperType, "easy-bulk-email-validator"))
+      .limit(1);
+
+    if (existingEasyBulkEmailValidator.length > 0) {
+      console.log(
+        "✅ Scraper Easy Bulk Email Validator existe déjà, mise à jour...",
+      );
+      await db
+        .update(scrapers)
+        .set({
+          name: "Easy Bulk Email Validator (Apify)",
+          description:
+            "Vérifie la délivrabilité des emails via MillionVerifier/Apify. ~$1/1000 emails. Utilisez Vérifier (Apify) sur un lead ou une collection.",
+          provider: "apify",
+          providerConfig: {
+            actorId:
+              "xmiso_scrapers/easy-bulk-email-validator---verify-emails-from-1-7-1000-rows",
+          },
+          formConfig: easyBulkEmailValidatorFormConfig,
+          mapperType: "easy-bulk-email-validator",
+          source: "apify",
+          infoType: "email_verify",
+          toolUrl: "https://console.apify.com/actors/QM5YJIYftbZQiNpgN/input",
+          paymentType: "pay_per_event",
+          costPerThousand: 1.0,
+          costPerLead: 0.001,
+          actorStartCost: null,
+          freeQuotaMonthly: 300,
+          pricingTiers: [
+            { name: "FREE", costPerThousand: 2.5, costPerLead: 0.0025 },
+            { name: "BRONZE", costPerThousand: 1.5, costPerLead: 0.0015 },
+            { name: "SILVER", costPerThousand: 1.3, costPerLead: 0.0013 },
+            { name: "GOLD/PLATINUM/DIAMOND", costPerThousand: 1.0, costPerLead: 0.001 },
+          ],
+          isActive: true,
+          updatedAt: new Date(),
+        })
+        .where(eq(scrapers.id, existingEasyBulkEmailValidator[0].id));
+      console.log("✅ Scraper Easy Bulk Email Validator mis à jour");
+    } else {
+      console.log("➕ Insertion du scraper Easy Bulk Email Validator...");
+      await db.insert(scrapers).values({
+        name: "Easy Bulk Email Validator (Apify)",
+        description:
+          "Vérifie la délivrabilité des emails via MillionVerifier/Apify. ~$1/1000 emails. Utilisez Vérifier (Apify) sur un lead ou une collection.",
+        provider: "apify",
+        providerConfig: {
+          actorId:
+            "xmiso_scrapers/easy-bulk-email-validator---verify-emails-from-1-7-1000-rows",
+        },
+        formConfig: easyBulkEmailValidatorFormConfig,
+        mapperType: "easy-bulk-email-validator",
+        source: "apify",
+        infoType: "email_verify",
+        toolUrl: "https://console.apify.com/actors/QM5YJIYftbZQiNpgN/input",
+        paymentType: "pay_per_event",
+        costPerThousand: 1.0,
+        costPerLead: 0.001,
+        actorStartCost: null,
+        freeQuotaMonthly: 300,
+        pricingTiers: [
+          { name: "FREE", costPerThousand: 2.5, costPerLead: 0.0025 },
+          { name: "BRONZE", costPerThousand: 1.5, costPerLead: 0.0015 },
+          { name: "SILVER", costPerThousand: 1.3, costPerLead: 0.0013 },
+          { name: "GOLD/PLATINUM/DIAMOND", costPerThousand: 1.0, costPerLead: 0.001 },
+        ],
+        isActive: true,
+      });
+      console.log("✅ Scraper Easy Bulk Email Validator inséré");
+    }
+
     // PageSpeed Insights - Analyse SEO
     const pageSpeedSeoFormConfig = {
       fields: [
@@ -1387,6 +1483,7 @@ async function seedScrapers() {
       "bulk-email-finder", // Bulk Email Finder
       "trustpilot-reviews", // Trustpilot Reviews Scraper
       "email-verify", // EmailListVerify
+      "easy-bulk-email-validator", // Easy Bulk Email Validator (Apify)
       "pagespeed-seo", // PageSpeed Insights
     ];
 

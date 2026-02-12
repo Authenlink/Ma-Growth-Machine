@@ -189,7 +189,8 @@ async function getOrCreateCompanyByDomain(
 export async function mapBulkEmailFinderDataToLeads(
   apifyData: BulkEmailFinderData[],
   collectionId: number,
-  userId: number
+  userId: number,
+  options?: { scraperId?: number },
 ): Promise<{
   created: number;
   skipped: number;
@@ -271,6 +272,7 @@ export async function mapBulkEmailFinderDataToLeads(
       const [insertedLead] = await db.insert(leads).values({
         userId,
         companyId: companyId || null,
+        sourceScraperId: options?.scraperId ?? null,
         firstName: data.firstName || null,
         lastName: data.lastName || null,
         fullName: fullName,

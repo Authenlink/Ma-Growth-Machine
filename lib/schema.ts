@@ -217,6 +217,9 @@ export const leads = pgTable("leads", {
   companyId: integer("company_id").references(() => companies.id, {
     onDelete: "set null",
   }),
+  sourceScraperId: integer("source_scraper_id").references(() => scrapers.id, {
+    onDelete: "set null",
+  }),
 
   // Informations personnelles
   personId: text("person_id"),
@@ -370,6 +373,36 @@ export const scraperRuns = pgTable(
     index("idx_scraper_runs_scraper_id").on(table.scraperId),
     index("idx_scraper_runs_created_at").on(table.createdAt),
     uniqueIndex("idx_scraper_runs_run_id").on(table.runId),
+  ],
+);
+
+// ============================================================
+// TABLE ENTITY_SCRAPER_USAGES - Tracking des scrapers par lead/company
+// ============================================================
+export const entityScraperUsages = pgTable(
+  "entity_scraper_usages",
+  {
+    id: serial("id").primaryKey(),
+    entityType: text("entity_type").notNull(), // "lead" | "company"
+    entityId: integer("entity_id").notNull(),
+    scraperId: integer("scraper_id").references(() => scrapers.id, {
+      onDelete: "set null",
+    }),
+    runId: text("run_id"), // null pour outils non-Apify (SEO)
+    source: text("source").notNull(), // enrich_lead, enrich_company, seo_analyze, etc.
+    hasResult: boolean("has_result").notNull(), // true si items trouvés
+    itemCount: integer("item_count").notNull(),
+    configUsed: jsonb("config_used").$type<Record<string, unknown>>(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_entity_scraper_usages_entity").on(table.entityType, table.entityId),
+    index("idx_entity_scraper_usages_scraper_id").on(table.scraperId),
+    index("idx_entity_scraper_usages_user_id").on(table.userId),
+    index("idx_entity_scraper_usages_created_at").on(table.createdAt),
   ],
 );
 

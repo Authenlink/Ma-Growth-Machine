@@ -10,6 +10,7 @@ import {
   LinkedInPostData,
 } from "@/lib/linkedin-posts-mapper";
 import { recordScraperRun } from "@/lib/scraper-runs";
+import { recordEntityScraperUsage } from "@/lib/entity-scraper-usages";
 
 // Timeout maximum pour un run (30 minutes)
 const MAX_RUN_TIMEOUT = 30 * 60 * 1000;
@@ -241,6 +242,17 @@ export async function POST(
           status: runStatus.status,
           fetchCostFromApify: true,
         });
+        await recordEntityScraperUsage({
+          entityType: "lead",
+          entityId: leadId,
+          scraperId,
+          runId: run.id,
+          source: "enrich_lead",
+          hasResult: false,
+          itemCount: 0,
+          configUsed: { maxPosts: maxPosts || 10, postedDateLimit: postedDateLimit ?? undefined },
+          userId,
+        });
       } catch {
         /* ignore */
       }
@@ -322,6 +334,22 @@ export async function POST(
         itemCount: items.length,
         status: runStatus.status,
         fetchCostFromApify: true,
+      });
+    } catch {
+      /* ignore */
+    }
+
+    try {
+      await recordEntityScraperUsage({
+        entityType: "lead",
+        entityId: leadId,
+        scraperId,
+        runId: run.id,
+        source: "enrich_lead",
+        hasResult: items.length > 0,
+        itemCount: items.length,
+        configUsed: { maxPosts: maxPosts || 10, postedDateLimit: postedDateLimit ?? undefined },
+        userId,
       });
     } catch {
       /* ignore */

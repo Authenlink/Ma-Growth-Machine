@@ -6,6 +6,7 @@ import { eq, and, isNull } from "drizzle-orm";
 import { getAdapter } from "@/lib/scrapers/adapter-factory";
 import { extractDomain } from "@/lib/bulk-email-finder-mapper";
 import { recordScraperRun } from "@/lib/scraper-runs";
+import { recordEntityScraperUsage } from "@/lib/entity-scraper-usages";
 
 // Timeout maximum pour un run (30 minutes)
 const MAX_RUN_TIMEOUT = 30 * 60 * 1000;
@@ -270,6 +271,30 @@ export async function POST(
       `[Enrichment Emails Collection] Enrichissement terminé pour collection ${collectionId}:`,
       `${mappingResult.enriched || 0} enrichis, ${mappingResult.skipped || 0} ignorés, ${mappingResult.errors || 0} erreurs`
     );
+
+    // Enregistrer l'usage du scraper pour chaque lead traité
+    const bulkItems = items as Array<{ firstName?: string; lastName?: string; domain?: string; email?: string; status?: string }>;
+    for (const item of bulkItems) {
+      const personString = `${item.firstName ?? ""}, ${item.lastName ?? ""}, ${item.domain ?? ""}`.trim();
+      const leadId = leadMapping.get(personString);
+      if (leadId != null) {
+        try {
+          await recordEntityScraperUsage({
+            entityType: "lead",
+            entityId: leadId,
+            scraperId,
+            runId: run.id,
+            source: "enrich_emails_collection",
+            hasResult: item.status === "FOUND" || !!item.email,
+            itemCount: item.status === "FOUND" ? 1 : 0,
+            configUsed: {},
+            userId,
+          });
+        } catch {
+          /* ignore */
+        }
+      }
+    }
 
     try {
       await recordScraperRun({

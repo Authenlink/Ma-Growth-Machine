@@ -381,18 +381,12 @@ export async function POST(request: NextRequest) {
     // Mapper et sauvegarder les leads dans la DB
     // Pour le scraper linkedin-company-employees, passer companyLinkedinUrl au mapper
     console.log(`[Scraping] Début mapToLeads (${items.length} items)`);
-    let mappingResult;
     const mapperType = scraperConfig.mapperType;
-    if (mapperType === "linkedin-company-employees" && companyLinkedinUrl) {
-      mappingResult = await (adapter as any).mapToLeads(
-        items,
-        collectionId,
-        userId,
-        companyLinkedinUrl,
-      );
-    } else {
-      mappingResult = await adapter.mapToLeads(items, collectionId, userId);
-    }
+    const mappingOptions = {
+      scraperId,
+      companyLinkedinUrl,
+    };
+    const mappingResult = await adapter.mapToLeads(items, collectionId, userId, mappingOptions);
 
     const duration = Math.round((Date.now() - startTime) / 1000);
 

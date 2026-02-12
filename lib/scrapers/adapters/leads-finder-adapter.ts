@@ -136,12 +136,14 @@ export class LeadsFinderAdapter extends ApifyAdapter {
   async mapToLeads(
     data: unknown[],
     collectionId: number,
-    userId: number
+    userId: number,
+    options?: { scraperId?: number; companyLinkedinUrl?: string },
   ): Promise<MappingResult> {
     return mapLeadsFinderDataToLeads(
       data as Record<string, unknown>[],
       collectionId,
-      userId
+      userId,
+      { scraperId: options?.scraperId },
     );
   }
 }

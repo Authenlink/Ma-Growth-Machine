@@ -348,7 +348,8 @@ async function enrichLead(
 export async function mapApifyDataToLeads(
   apifyData: ApifyLeadData[],
   collectionId: number,
-  userId: number
+  userId: number,
+  options?: { scraperId?: number },
 ): Promise<{
   created: number;
   skipped: number;
@@ -414,6 +415,7 @@ export async function mapApifyDataToLeads(
       const [insertedLead] = await db.insert(leads).values({
         userId,
         companyId: companyId || null,
+        sourceScraperId: options?.scraperId ?? null,
         personId: null, // Pas de personId dans les données Apify
         fullName: fullName || null,
         firstName: data.firstName && data.firstName.trim() !== "" ? data.firstName : null,

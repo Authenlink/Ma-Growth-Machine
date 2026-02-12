@@ -348,7 +348,8 @@ export async function mapLinkedInEmployeesToLeads(
   apifyData: LinkedInEmployeeData[],
   collectionId: number,
   userId: number,
-  companyLinkedinUrl?: string
+  companyLinkedinUrl?: string,
+  options?: { scraperId?: number },
 ): Promise<{
   created: number;
   skipped: number;
@@ -417,6 +418,7 @@ export async function mapLinkedInEmployeesToLeads(
       const [insertedLead] = await db.insert(leads).values({
         userId,
         companyId: companyId || null,
+        sourceScraperId: options?.scraperId ?? null,
         personId: data.id || null,
         fullName,
         firstName: data.firstName || null,

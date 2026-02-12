@@ -2,7 +2,13 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Mail, Linkedin, Trash2 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Mail, Linkedin, Trash2, CheckCircle2, XCircle, HelpCircle } from "lucide-react";
 import Link from "next/link";
 import { cleanIndustry } from "@/lib/utils";
 
@@ -13,6 +19,7 @@ interface Lead {
   lastName: string | null;
   position: string | null;
   email: string | null;
+  emailCertainty?: string | null;
   emailVerifyEmaillist?: string | null;
   linkedinUrl: string | null;
   seniority: string | null;
@@ -101,6 +108,7 @@ export function LeadsTableView({ leads, onDeleteLead }: LeadsTableViewProps) {
               <th className={headerCellClass}>Industrie</th>
               <th className={headerCellClass}>Taille</th>
               <th className={headerCellClass}>Email</th>
+              <th className={headerCellClass}>Email vérifié</th>
               <th className={headerCellClass}>Localisation</th>
               <th className={headerCellClass}>Seniority</th>
               <th className={headerCellClass}>Functional</th>
@@ -158,41 +166,61 @@ export function LeadsTableView({ leads, onDeleteLead }: LeadsTableViewProps) {
                   </td>
                   <td className={cellClass}>
                     {lead.email ? (
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <a
-                          href={`mailto:${lead.email}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="text-sm text-primary hover:underline flex items-center gap-1"
-                        >
-                          <Mail className="h-3 w-3 shrink-0" />
-                          {lead.email}
-                        </a>
-                        {lead.emailVerifyEmaillist && (
-                          <Badge
-                            variant={
-                              ["ok", "ok_for_all"].includes(lead.emailVerifyEmaillist)
-                                ? "success"
-                                : ["email_disabled", "dead_server", "invalid_mx", "disposable", "spamtrap"].includes(
-                                    lead.emailVerifyEmaillist
-                                  )
-                                  ? "destructive"
-                                  : "secondary"
-                            }
-                            className="text-[10px] px-1.5 py-0"
-                          >
-                            {lead.emailVerifyEmaillist === "ok"
-                              ? "OK"
-                              : lead.emailVerifyEmaillist === "ok_for_all"
-                                ? "Accepte tout"
-                                : lead.emailVerifyEmaillist === "email_disabled"
-                                  ? "Invalide"
-                                  : lead.emailVerifyEmaillist}
-                          </Badge>
-                        )}
-                      </div>
+                      <a
+                        href={`mailto:${lead.email}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-sm text-primary hover:underline flex items-center gap-1"
+                      >
+                        <Mail className="h-3 w-3 shrink-0" />
+                        {lead.email}
+                      </a>
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
+                  </td>
+                  <td className={cellClass}>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex items-center gap-1.5">
+                            {lead.emailVerifyEmaillist ? (
+                              ["ok", "ok_for_all", "valid"].includes(lead.emailVerifyEmaillist) ? (
+                                <Badge variant="success" className="text-xs gap-1">
+                                  <CheckCircle2 className="h-3 w-3" />
+                                  Oui
+                                </Badge>
+                              ) : ["invalid", "email_disabled", "dead_server", "invalid_mx", "disposable", "spamtrap", "invalid_syntax"].includes(lead.emailVerifyEmaillist) ? (
+                                <Badge variant="destructive" className="text-xs gap-1">
+                                  <XCircle className="h-3 w-3" />
+                                  Non
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary" className="text-xs gap-1">
+                                  {lead.emailVerifyEmaillist}
+                                </Badge>
+                              )
+                            ) : (
+                              <span className="text-muted-foreground inline-flex items-center gap-1">
+                                <HelpCircle className="h-3.5 w-3.5" />
+                                Non vérifié
+                              </span>
+                            )}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-[200px]">
+                          <p>
+                            {lead.emailVerifyEmaillist
+                              ? `Statut: ${lead.emailVerifyEmaillist}`
+                              : "Aucune vérification"}
+                          </p>
+                          {lead.emailCertainty && (
+                            <p className="text-muted-foreground mt-1">
+                              Certitude: {lead.emailCertainty}
+                            </p>
+                          )}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </td>
                   <td className={cellClass}>
                     <span className="text-sm">{location}</span>
