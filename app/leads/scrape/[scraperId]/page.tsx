@@ -125,19 +125,6 @@ interface ScrapingMetrics {
   errors: number;
 }
 
-interface SeoLocalResultItem {
-  company: string;
-  location: string;
-  industry: string;
-  analysis: {
-    seo_score: "Bon" | "Moyen" | "Faible";
-    avg_position: number;
-    queries_tested: Array<{ keyword: string; position: number | null; found: boolean }>;
-    verdict: string;
-    opportunity: string;
-  };
-  cost: { tokens_used: number; estimated_cost_usd: number };
-}
 
 export default function ScraperFormPage() {
   const { data: session, status } = useSession();
@@ -184,7 +171,6 @@ export default function ScraperFormPage() {
   >("idle");
   const [scrapingMetrics, setScrapingMetrics] =
     useState<ScrapingMetrics | null>(null);
-  const [seoResults, setSeoResults] = useState<SeoLocalResultItem[] | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
@@ -426,59 +412,6 @@ export default function ScraperFormPage() {
       return;
     }
 
-    // If SEO Local Ranking scraper, use seo-local-ranking API
-    if (scraper?.mapperType === "seo-local-ranking") {
-      const collectionId = formData.collectionId as number | undefined;
-      if (!collectionId || typeof collectionId !== "number") {
-        toast.error("Veuillez sélectionner un dossier et une collection");
-        return;
-      }
-      setIsScraping(true);
-      setScrapingStatus("running");
-      setScrapingMetrics(null);
-      setSeoResults(null);
-      setErrorMessage(null);
-      try {
-        const response = await fetch("/api/seo-local-ranking/analyze", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            folderId: formData.folderId,
-            collectionId,
-            selectedLeadIds: (formData.selectedLeads as number[] | undefined)?.length
-              ? (formData.selectedLeads as number[])
-              : undefined,
-            scraperId,
-          }),
-        });
-        const data = await response.json();
-        if (response.ok) {
-          setScrapingStatus("success");
-          setSeoResults(data.results ?? []);
-          setScrapingMetrics({
-            totalFound: data.metrics?.analyzed ?? 0,
-            created: data.metrics?.analyzed ?? 0,
-            skipped: 0,
-            errors: 0,
-          });
-          toast.success(
-            `Analyse terminée : ${data.metrics?.analyzed ?? 0} entreprise(s) analysée(s) ($${(data.metrics?.totalCostUsd ?? 0).toFixed(4)} USD)`,
-          );
-        } else {
-          setScrapingStatus("error");
-          setErrorMessage(data.error || "Erreur lors de l'analyse");
-          toast.error(data.error || "Erreur lors de l'analyse");
-        }
-      } catch (error) {
-        console.error("Erreur:", error);
-        setScrapingStatus("error");
-        setErrorMessage("Erreur de connexion lors de l'analyse");
-        toast.error("Erreur de connexion lors de l'analyse");
-      } finally {
-        setIsScraping(false);
-      }
-      return;
-    }
 
     // If EmailListVerify scraper, use verify-emails API
     if (scraper?.mapperType === "email-verify") {
@@ -1240,11 +1173,9 @@ export default function ScraperFormPage() {
                         <span className="font-medium">
                           {scraper?.mapperType === "email-verify"
                             ? "Vérification"
-                            : scraper?.mapperType === "seo-local-ranking"
-                              ? "Analyse"
-                              : isEnrichmentScraper
-                                ? "Enrichissement"
-                                : "Scraping"}{" "}
+                            : isEnrichmentScraper
+                              ? "Enrichissement"
+                              : "Scraping"}{" "}
                           terminé avec succès
                         </span>
                       </div>
@@ -1253,9 +1184,7 @@ export default function ScraperFormPage() {
                           <span className="text-muted-foreground">
                             {scraper?.mapperType === "email-verify"
                               ? "Total vérifiés:"
-                              : scraper?.mapperType === "seo-local-ranking"
-                                ? "Analysées:"
-                                : "Total trouvé:"}
+                              : "Total trouvé:"}
                           </span>
                           <span className="font-medium">
                             {scrapingMetrics.totalFound}
@@ -1331,87 +1260,6 @@ export default function ScraperFormPage() {
             </div>
           </div>
 
-          {/* Résultats SEO Local */}
-          {scraper?.mapperType === "seo-local-ranking" &&
-            scrapingStatus === "success" &&
-            seoResults &&
-            seoResults.length > 0 && (
-              <Card className="mt-4">
-                <CardHeader>
-                  <CardTitle>Résultats par entreprise</CardTitle>
-                  <CardDescription>
-                    Score, position moyenne, verdict et opportunité pour chaque
-                    entreprise analysée.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {seoResults.map((item, idx) => (
-                      <div
-                        key={idx}
-                        className="rounded-lg border p-4 space-y-3"
-                      >
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-semibold">{item.company}</span>
-                          <Badge
-                            variant={
-                              item.analysis.seo_score === "Bon"
-                                ? "default"
-                                : item.analysis.seo_score === "Moyen"
-                                  ? "secondary"
-                                  : "outline"
-                            }
-                          >
-                            {item.analysis.seo_score}
-                          </Badge>
-                          <span className="text-sm text-muted-foreground">
-                            {item.location} • {item.industry}
-                          </span>
-                        </div>
-                        <div className="grid gap-2 text-sm md:grid-cols-2">
-                          <div>
-                            <span className="text-muted-foreground">
-                              Position moyenne :
-                            </span>{" "}
-                            {item.analysis.avg_position > 0
-                              ? item.analysis.avg_position.toFixed(1)
-                              : "—"}
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">
-                              Coût :
-                            </span>{" "}
-                            ${item.cost.estimated_cost_usd.toFixed(4)} USD
-                          </div>
-                        </div>
-                        <p className="text-sm">{item.analysis.verdict}</p>
-                        <p className="text-sm text-muted-foreground">
-                          <span className="font-medium">Opportunité :</span>{" "}
-                          {item.analysis.opportunity}
-                        </p>
-                        {item.analysis.queries_tested.length > 0 && (
-                          <details className="text-sm">
-                            <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-                              Requêtes testées ({item.analysis.queries_tested.length})
-                            </summary>
-                            <ul className="mt-2 space-y-1 pl-4 list-disc">
-                              {item.analysis.queries_tested.map((q, i) => (
-                                <li key={i}>
-                                  {q.keyword} —{" "}
-                                  {q.found
-                                    ? `Position ${q.position}`
-                                    : "Non trouvé"}
-                                </li>
-                              ))}
-                            </ul>
-                          </details>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
         </div>
       </SidebarInset>
     </SidebarProvider>

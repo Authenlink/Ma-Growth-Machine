@@ -7,6 +7,48 @@ import {
 } from "./base-adapter";
 import { mapApifyDataToLeads, ApifyLeadData } from "../../apify-mapper";
 
+/** Valeurs acceptées par l'Actor Apollo (pipelinelabs/lead-scraper-apollo-zoominfo-lusha-ppe) */
+const APIFY_PERSON_FUNCTIONS = new Set([
+  "Accounting",
+  "Administrative",
+  "Arts & Design",
+  "Business Development",
+  "Consulting",
+  "Data Science",
+  "Education",
+  "Engineering",
+  "Entrepreneurship",
+  "Finance",
+  "Human Resources",
+  "Information Technology",
+  "Legal",
+  "Marketing",
+  "Media & Communications",
+  "Operations",
+  "Product Management",
+  "Research",
+  "Sales",
+  "Support",
+]);
+
+/** Mapping des valeurs de notre formulaire vers les valeurs Apify */
+const PERSON_FUNCTION_MAP: Record<string, string> = {
+  "Customer Success": "Support",
+};
+
+function mapPersonFunctions(values: string[]): string[] {
+  const result: string[] = [];
+  const seen = new Set<string>();
+  for (const v of values) {
+    const mapped = PERSON_FUNCTION_MAP[v] ?? v;
+    if (APIFY_PERSON_FUNCTIONS.has(mapped) && !seen.has(mapped)) {
+      result.push(mapped);
+      seen.add(mapped);
+    }
+  }
+  return result;
+}
+
 /**
  * Configuration du provider Apify
  */
@@ -66,11 +108,13 @@ export class ApifyAdapter implements ScraperAdapter {
     if (Array.isArray(params.seniorityExcludes)) {
       input.seniorityExcludes = params.seniorityExcludes;
     }
-    if (Array.isArray(params.personFunctionIncludes)) {
-      input.personFunctionIncludes = params.personFunctionIncludes;
+    if (Array.isArray(params.personFunctionIncludes) && params.personFunctionIncludes.length > 0) {
+      const mapped = mapPersonFunctions(params.personFunctionIncludes as string[]);
+      if (mapped.length > 0) input.personFunctionIncludes = mapped;
     }
-    if (Array.isArray(params.personFunctionExcludes)) {
-      input.personFunctionExcludes = params.personFunctionExcludes;
+    if (Array.isArray(params.personFunctionExcludes) && params.personFunctionExcludes.length > 0) {
+      const mapped = mapPersonFunctions(params.personFunctionExcludes as string[]);
+      if (mapped.length > 0) input.personFunctionExcludes = mapped;
     }
     if (Array.isArray(params.personLocationCountryIncludes) && params.personLocationCountryIncludes.length > 0) {
       input.personLocationCountryIncludes = params.personLocationCountryIncludes;

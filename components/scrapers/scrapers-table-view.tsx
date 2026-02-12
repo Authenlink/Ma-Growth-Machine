@@ -58,7 +58,6 @@ const MAPPER_TYPE_LABELS: Record<string, string> = {
   "email-verify": "Email Verify",
   "trustpilot-reviews": "Trustpilot",
   "pagespeed-seo": "PageSpeed",
-  "seo-local-ranking": "SEO Local",
   "linkedin-company-posts": "LinkedIn Posts",
   "linkedin-profile-posts": "LinkedIn Profile",
   "linkedin-company-employees": "LinkedIn Employees",
@@ -135,7 +134,13 @@ export function ScrapersTableView({ scrapers }: ScrapersTableViewProps) {
                 <tr
                   key={scraper.id}
                   className="border-b border-border transition-colors hover:bg-muted/50 cursor-pointer even:bg-muted/30"
-                  onClick={() => router.push(`/leads/scrape/${scraper.id}`)}
+                  onClick={() => {
+                  if (scraper.mapperType === "pagespeed-seo") {
+                    router.push("/enrichment/seo");
+                  } else {
+                    router.push(`/leads/scrape/${scraper.id}`);
+                  }
+                }}
                 >
                   {/* Nom (sticky) */}
                   <td className={getStickyCellClass(index % 2 === 1)}>

@@ -54,6 +54,7 @@ interface Scraper {
   name: string;
   description: string | null;
   provider: string;
+  mapperType?: string | null;
   source?: string | null;
   infoType?: string | null;
   toolUrl?: string | null;
@@ -344,9 +345,13 @@ export default function ScrapePage() {
                               <ScraperCard
                                 key={scraper.id}
                                 scraper={scraper}
-                                onClick={() =>
-                                  router.push(`/leads/scrape/${scraper.id}`)
-                                }
+                                onClick={() => {
+                                  if (scraper.mapperType === "pagespeed-seo") {
+                                    router.push("/enrichment/seo");
+                                  } else {
+                                    router.push(`/leads/scrape/${scraper.id}`);
+                                  }
+                                }}
                               />
                             ))}
                           </div>
@@ -360,7 +365,13 @@ export default function ScrapePage() {
                     <ScraperCard
                       key={scraper.id}
                       scraper={scraper}
-                      onClick={() => router.push(`/leads/scrape/${scraper.id}`)}
+                      onClick={() => {
+                    if (scraper.mapperType === "pagespeed-seo") {
+                      router.push("/enrichment/seo");
+                    } else {
+                      router.push(`/leads/scrape/${scraper.id}`);
+                    }
+                  }}
                     />
                   ))}
                 </div>

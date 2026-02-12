@@ -698,7 +698,7 @@ async function seedScrapers() {
       await db
         .update(scrapers)
         .set({
-          name: "Apify LinkedIn Scraper",
+          name: "Leads Scraper - Apollo Scraper",
           description:
             "Scraper de leads LinkedIn via Apify. Permet de filtrer par titre, localisation, entreprise et bien plus.",
           provider: "apify",
@@ -724,7 +724,7 @@ async function seedScrapers() {
     } else {
       console.log("➕ Insertion du scraper Apify LinkedIn...");
       await db.insert(scrapers).values({
-        name: "Apify LinkedIn Scraper",
+        name: "Leads Scraper - Apollo",
         description:
           "Scraper de leads LinkedIn via Apify. Permet de filtrer par titre, localisation, entreprise et bien plus.",
         provider: "apify",
@@ -757,7 +757,7 @@ async function seedScrapers() {
       await db
         .update(scrapers)
         .set({
-          name: "Leads Finder (Code Crafter)",
+          name: "Leads Scraper - Finder (Code Crafter)",
           description:
             "Alternative Apollo à $1.5/1k leads. Emails vérifiés, téléphones, LinkedIn, infos entreprise.",
           provider: "apify",
@@ -781,7 +781,7 @@ async function seedScrapers() {
     } else {
       console.log("➕ Insertion du scraper Leads Finder...");
       await db.insert(scrapers).values({
-        name: "Leads Finder (Code Crafter)",
+        name: "Leads Scraper - Finder (Code Crafter)",
         description:
           "Alternative Apollo à $1.5/1k leads. Emails vérifiés, téléphones, LinkedIn, infos entreprise.",
         provider: "apify",
@@ -1325,106 +1325,6 @@ async function seedScrapers() {
       ],
     };
 
-    // Positionnement SEO Local
-    const seoLocalRankingFormConfig = {
-      fields: [
-        {
-          id: "folder_collection",
-          type: "folder_collection" as const,
-          label: "Dossier et collection",
-          required: true,
-          helpText:
-            "Sélectionnez d'abord un dossier, puis une collection cible pour analyser le positionnement SEO local des entreprises.",
-        },
-        {
-          id: "selectedLeads",
-          type: "leads" as const,
-          label: "Sélectionner des leads",
-          helpText:
-            "Optionnel : sélectionnez des leads pour n'analyser que ces entreprises. Si vide, toute la collection est analysée. Seuls les leads avec une entreprise (nom, industrie, ville) sont affichés.",
-          leadsFilterMode: "has_company" as const,
-        },
-      ],
-      sections: [
-        {
-          title: "Dossier et collection",
-          description:
-            "Sélectionnez un dossier puis une collection contenant des leads avec des entreprises.",
-          fields: ["folder_collection"],
-        },
-        {
-          title: "Leads à analyser",
-          description:
-            "Optionnel : choisissez des leads spécifiques ou laissez vide pour analyser toute la collection.",
-          fields: ["selectedLeads"],
-        },
-      ],
-    };
-
-    const existingSeoLocal = await db
-      .select()
-      .from(scrapers)
-      .where(eq(scrapers.mapperType, "seo-local-ranking"))
-      .limit(1);
-
-    if (existingSeoLocal.length > 0) {
-      console.log("✅ Scraper Positionnement SEO Local existe déjà, mise à jour...");
-      await db
-        .update(scrapers)
-        .set({
-          name: "Positionnement SEO Local",
-          description:
-            "Analyse automatiquement le positionnement Google d'une entreprise sur ses mots-clés métiers dans sa zone géographique locale. Utilise OpenAI pour générer les requêtes et vérifier les homonymes, puis Apify pour les recherches Google géolocalisées.",
-          provider: "openai_apify",
-          providerConfig: {
-            openaiModel: "gpt-4o-mini",
-            apifyActor: "apify/google-search-scraper",
-          },
-          formConfig: seoLocalRankingFormConfig,
-          mapperType: "seo-local-ranking",
-          source: "seo_local_ranking",
-          infoType: "seo",
-          toolUrl: "https://apify.com/apify/google-search-scraper",
-          paymentType: "pay_per_result",
-          costPerThousand: null,
-          costPerLead: null,
-          actorStartCost: null,
-          freeQuotaMonthly: null,
-          pricingTiers: null,
-          usesAi: true,
-          isActive: true,
-          updatedAt: new Date(),
-        })
-        .where(eq(scrapers.id, existingSeoLocal[0].id));
-      console.log("✅ Scraper Positionnement SEO Local mis à jour");
-    } else {
-      console.log("➕ Insertion du scraper Positionnement SEO Local...");
-      await db.insert(scrapers).values({
-        name: "Positionnement SEO Local",
-        description:
-          "Analyse automatiquement le positionnement Google d'une entreprise sur ses mots-clés métiers dans sa zone géographique locale. Utilise OpenAI pour générer les requêtes et vérifier les homonymes, puis Apify pour les recherches Google géolocalisées.",
-        provider: "openai_apify",
-        providerConfig: {
-          openaiModel: "gpt-4o-mini",
-          apifyActor: "apify/google-search-scraper",
-        },
-        formConfig: seoLocalRankingFormConfig,
-        mapperType: "seo-local-ranking",
-        source: "seo_local_ranking",
-        infoType: "seo",
-        toolUrl: "https://apify.com/apify/google-search-scraper",
-        paymentType: "pay_per_result",
-        costPerThousand: null,
-        costPerLead: null,
-        actorStartCost: null,
-        freeQuotaMonthly: null,
-        pricingTiers: null,
-        usesAi: true,
-        isActive: true,
-      });
-      console.log("✅ Scraper Positionnement SEO Local inséré");
-    }
-
     const existingPageSpeed = await db
       .select()
       .from(scrapers)
@@ -1475,6 +1375,52 @@ async function seedScrapers() {
         isActive: true,
       });
       console.log("✅ Scraper PageSpeed Insights inséré");
+    }
+
+    // Désactiver les scrapers qui ne sont plus dans la liste active
+    const activeMapperTypes = [
+      "apify", // Leads Scraper - Apollo
+      "leads-finder", // Leads Scraper - Finder (Code Crafter)
+      "linkedin-company-posts", // LinkedIn Company Posts Enrichment
+      "linkedin-profile-posts", // LinkedIn Profile Posts Enrichment
+      "linkedin-company-employees", // LinkedIn Company Employees Scraper
+      "bulk-email-finder", // Bulk Email Finder
+      "trustpilot-reviews", // Trustpilot Reviews Scraper
+      "email-verify", // EmailListVerify
+      "pagespeed-seo", // PageSpeed Insights
+    ];
+
+    console.log("🔄 Désactivation des scrapers obsolètes...");
+    // Récupérer tous les scrapers actifs qui ne sont pas dans la liste active
+    const obsoleteScrapers = await db
+      .select()
+      .from(scrapers)
+      .where(
+        and(
+          eq(scrapers.isActive, true),
+          // Utiliser not in avec une requête SQL personnalisée
+        ),
+      );
+
+    // Filtrer manuellement les scrapers obsolètes
+    const scrapersToDeactivate = obsoleteScrapers.filter(
+      (scraper) => !activeMapperTypes.includes(scraper.mapperType),
+    );
+
+    if (scrapersToDeactivate.length > 0) {
+      console.log(
+        `📋 Trouvé ${scrapersToDeactivate.length} scraper(s) obsolète(s) à désactiver:`,
+      );
+      for (const scraper of scrapersToDeactivate) {
+        console.log(`  - ${scraper.name} (${scraper.mapperType})`);
+        await db
+          .update(scrapers)
+          .set({ isActive: false, updatedAt: new Date() })
+          .where(eq(scrapers.id, scraper.id));
+      }
+      console.log("✅ Scrapers obsolètes désactivés");
+    } else {
+      console.log("✅ Aucun scraper obsolète trouvé");
     }
 
     console.log("🎉 Seeding terminé!");

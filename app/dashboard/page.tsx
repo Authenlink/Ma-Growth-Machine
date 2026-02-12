@@ -7,7 +7,6 @@ import { useEffect, useState } from "react";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { Users, Building2, FolderOpen, DollarSign } from "lucide-react";
 import { AppSidebar } from "@/components/app-sidebar";
-import { Button } from "@/components/ui/button";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -24,7 +23,6 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { useScroll } from "@/hooks/use-scroll";
-import { EmptyState } from "@/components/empty-state";
 import {
   Card,
   CardContent,
@@ -150,13 +148,18 @@ export default function DashboardPage() {
       if (status === "authenticated") {
         try {
           setLoadingChart(true);
-          const response = await fetch(`/api/dashboard/chart?timeRange=${timeRange}`);
+          const response = await fetch(
+            `/api/dashboard/chart?timeRange=${timeRange}`,
+          );
           if (response.ok) {
             const data = await response.json();
             setChartData(data);
           }
         } catch (error) {
-          console.error("Erreur lors de la récupération des données du graphique:", error);
+          console.error(
+            "Erreur lors de la récupération des données du graphique:",
+            error,
+          );
         } finally {
           setLoadingChart(false);
         }
@@ -172,7 +175,7 @@ export default function DashboardPage() {
         try {
           setLoadingSpending(true);
           const response = await fetch(
-            `/api/scraper-runs/summary?period=${spendingPeriod}`
+            `/api/scraper-runs/summary?period=${spendingPeriod}`,
           );
           if (response.ok) {
             const data = await response.json();
@@ -181,7 +184,7 @@ export default function DashboardPage() {
         } catch (error) {
           console.error(
             "Erreur lors de la récupération du total dépensé:",
-            error
+            error,
           );
         } finally {
           setLoadingSpending(false);
@@ -198,7 +201,7 @@ export default function DashboardPage() {
         try {
           setLoadingSpendingChart(true);
           const response = await fetch(
-            `/api/dashboard/spending-chart?timeRange=${spendingTimeRange}`
+            `/api/dashboard/spending-chart?timeRange=${spendingTimeRange}`,
           );
           if (response.ok) {
             const data = await response.json();
@@ -209,7 +212,7 @@ export default function DashboardPage() {
         } catch (error) {
           console.error(
             "Erreur lors de la récupération du graphique dépenses:",
-            error
+            error,
           );
         } finally {
           setLoadingSpendingChart(false);
@@ -322,23 +325,25 @@ export default function DashboardPage() {
                 ) : (
                   <div className="text-2xl font-bold">{stats?.leads || 0}</div>
                 )}
-                <p className="text-xs text-muted-foreground">
-                  Total des leads
-                </p>
+                <p className="text-xs text-muted-foreground">Total des leads</p>
               </CardContent>
             </Card>
 
             {/* Carte Companies */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Entreprises</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  Entreprises
+                </CardTitle>
                 <Building2 className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 {loadingStats ? (
                   <Skeleton className="h-8 w-20" />
                 ) : (
-                  <div className="text-2xl font-bold">{stats?.companies || 0}</div>
+                  <div className="text-2xl font-bold">
+                    {stats?.companies || 0}
+                  </div>
                 )}
                 <p className="text-xs text-muted-foreground">
                   Total des entreprises
@@ -349,14 +354,18 @@ export default function DashboardPage() {
             {/* Carte Collections */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Collections</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  Collections
+                </CardTitle>
                 <FolderOpen className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 {loadingStats ? (
                   <Skeleton className="h-8 w-20" />
                 ) : (
-                  <div className="text-2xl font-bold">{stats?.collections || 0}</div>
+                  <div className="text-2xl font-bold">
+                    {stats?.collections || 0}
+                  </div>
                 )}
                 <p className="text-xs text-muted-foreground">
                   Total des collections
@@ -418,113 +427,130 @@ export default function DashboardPage() {
                     Nombre de leads et entreprises ajoutés chaque jour
                   </CardDescription>
                 </div>
-              <Select value={timeRange} onValueChange={setTimeRange}>
-                <SelectTrigger
-                  className="hidden w-[160px] rounded-lg sm:ml-auto sm:flex"
-                  aria-label="Sélectionner une période"
-                >
-                  <SelectValue placeholder="Derniers 30 jours" />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  <SelectItem value="90d" className="rounded-lg">
-                    Derniers 3 mois
-                  </SelectItem>
-                  <SelectItem value="30d" className="rounded-lg">
-                    Derniers 30 jours
-                  </SelectItem>
-                  <SelectItem value="7d" className="rounded-lg">
-                    Derniers 7 jours
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </CardHeader>
-            <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
-              {loadingChart ? (
-                <Skeleton className="h-[250px] w-full" />
-              ) : chartData.length === 0 ? (
-                <div className="flex h-[250px] items-center justify-center text-muted-foreground">
-                  Aucune donnée disponible
-                </div>
-              ) : (
-                <ChartContainer
-                  config={chartConfig}
-                  className="aspect-auto h-[250px] w-full"
-                >
-                  <AreaChart data={chartData}>
-                    <defs>
-                      <linearGradient id="fillLeads" x1="0" y1="0" x2="0" y2="1">
-                        <stop
-                          offset="5%"
-                          stopColor="var(--color-leads)"
-                          stopOpacity={0.8}
-                        />
-                        <stop
-                          offset="95%"
-                          stopColor="var(--color-leads)"
-                          stopOpacity={0.1}
-                        />
-                      </linearGradient>
-                      <linearGradient id="fillCompanies" x1="0" y1="0" x2="0" y2="1">
-                        <stop
-                          offset="5%"
-                          stopColor="var(--color-companies)"
-                          stopOpacity={0.8}
-                        />
-                        <stop
-                          offset="95%"
-                          stopColor="var(--color-companies)"
-                          stopOpacity={0.1}
-                        />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid vertical={false} />
-                    <XAxis
-                      dataKey="date"
-                      tickLine={false}
-                      axisLine={false}
-                      tickMargin={8}
-                      minTickGap={32}
-                      tickFormatter={(value) => {
-                        const date = new Date(value);
-                        return date.toLocaleDateString("fr-FR", {
-                          month: "short",
-                          day: "numeric",
-                        });
-                      }}
-                    />
-                    <ChartTooltip
-                      cursor={false}
-                      content={
-                        <ChartTooltipContent
-                          labelFormatter={(value) => {
-                            return new Date(value).toLocaleDateString("fr-FR", {
-                              month: "short",
-                              day: "numeric",
-                            });
-                          }}
-                          indicator="dot"
-                        />
-                      }
-                    />
-                    <Area
-                      dataKey="companies"
-                      type="monotone"
-                      fill="url(#fillCompanies)"
-                      stroke="var(--color-companies)"
-                      stackId="a"
-                    />
-                    <Area
-                      dataKey="leads"
-                      type="monotone"
-                      fill="url(#fillLeads)"
-                      stroke="var(--color-leads)"
-                      stackId="a"
-                    />
-                    <ChartLegend content={<ChartLegendContent />} />
-                  </AreaChart>
-                </ChartContainer>
-              )}
-            </CardContent>
+                <Select value={timeRange} onValueChange={setTimeRange}>
+                  <SelectTrigger
+                    className="hidden w-[160px] rounded-lg sm:ml-auto sm:flex"
+                    aria-label="Sélectionner une période"
+                  >
+                    <SelectValue placeholder="Derniers 30 jours" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="90d" className="rounded-lg">
+                      Derniers 3 mois
+                    </SelectItem>
+                    <SelectItem value="30d" className="rounded-lg">
+                      Derniers 30 jours
+                    </SelectItem>
+                    <SelectItem value="7d" className="rounded-lg">
+                      Derniers 7 jours
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </CardHeader>
+              <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
+                {loadingChart ? (
+                  <Skeleton className="h-[250px] w-full" />
+                ) : chartData.length === 0 ? (
+                  <div className="flex h-[250px] items-center justify-center text-muted-foreground">
+                    Aucune donnée disponible
+                  </div>
+                ) : (
+                  <ChartContainer
+                    config={chartConfig}
+                    className="aspect-auto h-[250px] w-full"
+                  >
+                    <AreaChart data={chartData}>
+                      <defs>
+                        <linearGradient
+                          id="fillLeads"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="5%"
+                            stopColor="var(--color-leads)"
+                            stopOpacity={0.8}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor="var(--color-leads)"
+                            stopOpacity={0.1}
+                          />
+                        </linearGradient>
+                        <linearGradient
+                          id="fillCompanies"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="5%"
+                            stopColor="var(--color-companies)"
+                            stopOpacity={0.8}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor="var(--color-companies)"
+                            stopOpacity={0.1}
+                          />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid vertical={false} />
+                      <XAxis
+                        dataKey="date"
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                        minTickGap={32}
+                        tickFormatter={(value) => {
+                          const date = new Date(value);
+                          return date.toLocaleDateString("fr-FR", {
+                            month: "short",
+                            day: "numeric",
+                          });
+                        }}
+                      />
+                      <ChartTooltip
+                        cursor={false}
+                        content={
+                          <ChartTooltipContent
+                            labelFormatter={(value) => {
+                              return new Date(value).toLocaleDateString(
+                                "fr-FR",
+                                {
+                                  month: "short",
+                                  day: "numeric",
+                                },
+                              );
+                            }}
+                            indicator="dot"
+                          />
+                        }
+                      />
+                      <Area
+                        dataKey="companies"
+                        type="natural"
+                        fill="url(#fillCompanies)"
+                        stroke="var(--color-companies)"
+                        strokeWidth={2}
+                        stackId="a"
+                      />
+                      <Area
+                        dataKey="leads"
+                        type="natural"
+                        fill="url(#fillLeads)"
+                        stroke="var(--color-leads)"
+                        strokeWidth={2}
+                        stackId="a"
+                      />
+                      <ChartLegend content={<ChartLegendContent />} />
+                    </AreaChart>
+                  </ChartContainer>
+                )}
+              </CardContent>
             </Card>
 
             {/* Section Graphique dépenses */}
@@ -672,12 +698,15 @@ export default function DashboardPage() {
                                 {
                                   month: "short",
                                   day: "numeric",
-                                }
+                                },
                               );
                             }}
                             formatter={(value, name) => {
                               if (name === "costUsd") {
-                                return [`${Number(value).toFixed(2)} $`, "Coût"];
+                                return [
+                                  `${Number(value).toFixed(2)} $`,
+                                  "Coût",
+                                ];
                               }
                               const label =
                                 name === "succeeded"

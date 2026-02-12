@@ -52,6 +52,13 @@ interface Collection {
   description: string | null;
 }
 
+interface Folder {
+  id: number;
+  name: string;
+  description: string | null;
+  collections: Collection[];
+}
+
 interface Lead {
   id: number;
   fullName: string | null;
@@ -98,9 +105,10 @@ function SeoInsightsPageContent() {
 
   const [mode, setMode] = useState<"single" | "collection">("single");
   const [singleValue, setSingleValue] = useState<SingleSelectValue>(null);
+  const [folderId, setFolderId] = useState<number | null>(null);
   const [collectionId, setCollectionId] = useState<number | null>(null);
 
-  const [collections, setCollections] = useState<Collection[]>([]);
+  const [folders, setFolders] = useState<Folder[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [preselectedCompany, setPreselectedCompany] = useState<Company | null>(
@@ -166,13 +174,13 @@ function SeoInsightsPageContent() {
     const fetchData = async () => {
       if (status !== "authenticated") return;
       try {
-        const [collectionsRes, leadsRes, companiesRes] = await Promise.all([
-          fetch("/api/collections"),
+        const [foldersRes, leadsRes, companiesRes] = await Promise.all([
+          fetch("/api/folders"),
           fetch("/api/leads?limit=500"),
           fetch("/api/companies?limit=500"),
         ]);
 
-        if (collectionsRes.ok) setCollections(await collectionsRes.json());
+        if (foldersRes.ok) setFolders(await foldersRes.json());
         if (leadsRes.ok) {
           const data = await leadsRes.json();
           setLeads(data.data ?? data);
@@ -239,10 +247,13 @@ function SeoInsightsPageContent() {
   const collectionWithoutWebsite =
     collectionLeads.length - collectionWithWebsite.length;
 
+  const selectedFolder = folders.find((f) => f.id === folderId);
+  const collectionsInFolder = selectedFolder?.collections ?? [];
+
   const canSubmit =
     mode === "single"
       ? singleValue !== null
-      : collectionId !== null && collectionLeads.length > 0;
+      : folderId !== null && collectionId !== null && collectionLeads.length > 0;
 
   const hasWebsiteWarning =
     mode === "single" && singleValue
@@ -384,6 +395,7 @@ function SeoInsightsPageContent() {
                       onValueChange={(v) => {
                         setMode(v as "single" | "collection");
                         setSingleValue(null);
+                        setFolderId(null);
                         setCollectionId(null);
                         setResult({ status: "idle" });
                       }}
@@ -439,26 +451,57 @@ function SeoInsightsPageContent() {
                   )}
 
                   {mode === "collection" && (
-                    <div className="space-y-2">
-                      <Label htmlFor="collection-select">Collection</Label>
-                      <Select
-                        value={collectionId?.toString() ?? ""}
-                        onValueChange={(v) => {
-                          setCollectionId(v ? parseInt(v) : null);
-                          setResult({ status: "idle" });
-                        }}
-                      >
-                        <SelectTrigger id="collection-select">
-                          <SelectValue placeholder="Choisir une collection" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {collections.map((c) => (
-                            <SelectItem key={c.id} value={c.id.toString()}>
-                              {c.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="folder-select">Dossier</Label>
+                        <Select
+                          value={folderId?.toString() ?? ""}
+                          onValueChange={(v) => {
+                            setFolderId(v ? parseInt(v) : null);
+                            setCollectionId(null);
+                            setResult({ status: "idle" });
+                          }}
+                        >
+                          <SelectTrigger id="folder-select">
+                            <SelectValue placeholder="Choisir un dossier" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {folders.map((f) => (
+                              <SelectItem key={f.id} value={f.id.toString()}>
+                                {f.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="collection-select">Collection</Label>
+                        <Select
+                          value={collectionId?.toString() ?? ""}
+                          onValueChange={(v) => {
+                            setCollectionId(v ? parseInt(v) : null);
+                            setResult({ status: "idle" });
+                          }}
+                          disabled={!folderId}
+                        >
+                          <SelectTrigger id="collection-select">
+                            <SelectValue
+                              placeholder={
+                                folderId
+                                  ? "Choisir une collection"
+                                  : "Sélectionnez d'abord un dossier"
+                              }
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {collectionsInFolder.map((c) => (
+                              <SelectItem key={c.id} value={c.id.toString()}>
+                                {c.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                       {collectionId && loadingCollectionLeads && (
                         <p className="text-sm text-muted-foreground">
                           Chargement des leads...
