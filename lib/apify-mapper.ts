@@ -13,6 +13,7 @@ export interface ApifyLeadData {
   fullName?: string;
   position?: string;
   linkedinUrl?: string;
+  headline?: string;
   seniority?: string;
   functional?: string; // Format: "['sales']" ou similaire (string, pas array)
 
@@ -23,6 +24,8 @@ export interface ApifyLeadData {
   orgFoundedYear?: string | number;
   orgIndustry?: string;
   orgSize?: string;
+  orgDomain?: string;
+  orgTechnologies?: string;
   orgDescription?: string;
   orgCity?: string;
   orgState?: string;
@@ -145,10 +148,12 @@ async function getOrCreateCompany(
     return null;
   }
 
-  // Extraire le domaine depuis le website si disponible
-  const domain = companyData.orgWebsite 
-    ? extractDomain(companyData.orgWebsite)
-    : null;
+  // Extraire le domaine : priorité orgDomain (ex: company_domain), sinon depuis website
+  const domain = companyData.orgDomain && companyData.orgDomain.trim() !== ""
+    ? companyData.orgDomain.trim().replace(/^www\./, "")
+    : companyData.orgWebsite
+      ? extractDomain(companyData.orgWebsite)
+      : null;
 
   // Chercher une company existante par nom, domaine ou website
   const searchConditions = [eq(companies.name, companyData.orgName)];
@@ -184,13 +189,16 @@ async function getOrCreateCompany(
       industry: companyData.orgIndustry && companyData.orgIndustry.trim() !== ""
         ? companyData.orgIndustry
         : null,
-      size: companyData.orgSize && companyData.orgSize.trim() !== ""
-        ? companyData.orgSize
+      size: companyData.orgSize && String(companyData.orgSize).trim() !== ""
+        ? String(companyData.orgSize)
         : null,
       description: companyData.orgDescription && companyData.orgDescription.trim() !== ""
         ? companyData.orgDescription
         : null,
-      specialities: null, // Pas de champ spécialités dans les données Apify
+      specialities: null,
+      technologies: companyData.orgTechnologies && companyData.orgTechnologies.trim() !== ""
+        ? companyData.orgTechnologies
+        : null,
       city: companyData.orgCity && companyData.orgCity.trim() !== ""
         ? companyData.orgCity
         : null,
@@ -260,6 +268,9 @@ async function enrichLead(
   }
   if (!existingLead.linkedinUrl && data.linkedinUrl) {
     updateData.linkedinUrl = parseLinkedinUrl(data.linkedinUrl);
+  }
+  if (!existingLead.headline && data.headline) {
+    updateData.headline = data.headline;
   }
   if (!existingLead.seniority && data.seniority) {
     updateData.seniority = data.seniority;
@@ -409,6 +420,7 @@ export async function mapApifyDataToLeads(
         lastName: data.lastName && data.lastName.trim() !== "" ? data.lastName : null,
         position: data.position && data.position.trim() !== "" ? data.position : null,
         linkedinUrl: parseLinkedinUrl(data.linkedinUrl),
+        headline: data.headline && data.headline.trim() !== "" ? data.headline : null,
         seniority: data.seniority && data.seniority.trim() !== "" ? data.seniority : null,
         functional: functionalArray && functionalArray.length > 0 
           ? functionalArray.join(", ") 

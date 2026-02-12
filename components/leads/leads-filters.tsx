@@ -22,12 +22,21 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 interface Collection {
   id: number;
   name: string;
+  folderName?: string | null;
+  isDefault?: boolean;
+}
+
+interface Folder {
+  id: number;
+  name: string;
 }
 
 interface LeadsFiltersProps {
   collections: Collection[];
+  folders: Folder[];
   filters: {
     collectionId?: string;
+    folderId?: string;
     companyName?: string;
     leadName?: string;
     seniority?: string;
@@ -42,6 +51,7 @@ interface LeadsFiltersProps {
 
 export function LeadsFilters({
   collections,
+  folders = [],
   filters,
   onFiltersChange,
   resultCount,
@@ -106,30 +116,6 @@ export function LeadsFilters({
           />
         </div>
 
-        <div className="flex-1 min-w-[200px]">
-          <Label htmlFor="filter-collection" className="text-xs mb-1.5 block">
-            Collection
-          </Label>
-          <Select
-            value={localFilters.collectionId || "all"}
-            onValueChange={(value) =>
-              handleFilterChange("collectionId", value)
-            }
-          >
-            <SelectTrigger id="filter-collection">
-              <SelectValue placeholder="Toutes les collections" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Toutes les collections</SelectItem>
-              {collections.map((collection) => (
-                <SelectItem key={collection.id} value={collection.id.toString()}>
-                  {collection.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
         {hasActiveFilters && (
           <Button
             variant="outline"
@@ -167,6 +153,55 @@ export function LeadsFilters({
         <CollapsibleContent className="mt-4">
           <div className="rounded-lg border bg-card p-4">
             <FieldGroup className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <Field>
+                <FieldLabel htmlFor="filter-folder">Dossier</FieldLabel>
+                <Select
+                  value={localFilters.folderId || "all"}
+                  onValueChange={(value) =>
+                    handleFilterChange("folderId", value)
+                  }
+                >
+                  <SelectTrigger id="filter-folder">
+                    <SelectValue placeholder="Tous les dossiers" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous les dossiers</SelectItem>
+                    {folders.map((folder) => (
+                      <SelectItem key={folder.id} value={folder.id.toString()}>
+                        {folder.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+
+              <Field>
+                <FieldLabel htmlFor="filter-collection">Collection</FieldLabel>
+                <Select
+                  value={localFilters.collectionId || "all"}
+                  onValueChange={(value) =>
+                    handleFilterChange("collectionId", value)
+                  }
+                >
+                  <SelectTrigger id="filter-collection">
+                    <SelectValue placeholder="Toutes les collections" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Toutes les collections</SelectItem>
+                    {collections.map((collection) => (
+                      <SelectItem
+                        key={collection.id}
+                        value={collection.id.toString()}
+                      >
+                        {collection.folderName
+                          ? `${collection.name} (${collection.folderName})${collection.isDefault ? " — par défaut" : ""}`
+                          : `${collection.name}${collection.isDefault ? " — par défaut" : ""}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+
               <Field>
                 <FieldLabel htmlFor="filter-seniority">Seniority</FieldLabel>
                 <Input

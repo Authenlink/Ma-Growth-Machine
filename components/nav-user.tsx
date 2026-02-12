@@ -58,7 +58,9 @@ export function NavUser({
   const { theme, setTheme } = useTheme();
 
   const handleSignOut = () => {
-    signOut({ callbackUrl: "/login" });
+    // Use current origin to avoid localhost redirect in production
+    const callbackUrl = typeof window !== "undefined" ? `${window.location.origin}/login` : "/login";
+    signOut({ callbackUrl });
   };
 
   return (

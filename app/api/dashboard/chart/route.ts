@@ -18,7 +18,6 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const timeRange = searchParams.get("timeRange") || "90d";
 
-    // Calculer la date de début selon le timeRange
     const now = new Date();
     let daysToSubtract = 90;
     if (timeRange === "30d") {
@@ -26,37 +25,56 @@ export async function GET(request: NextRequest) {
     } else if (timeRange === "7d") {
       daysToSubtract = 7;
     }
-    const startDate = new Date(now);
-    startDate.setDate(startDate.getDate() - daysToSubtract);
-    startDate.setHours(0, 0, 0, 0);
 
-    // La date de fin doit toujours inclure aujourd'hui
-    const endDate = new Date(now);
-    endDate.setHours(23, 59, 59, 999);
+    // Utiliser UTC pour correspondre à PostgreSQL (Neon utilise UTC)
+    const startDate = new Date(
+      Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate() - daysToSubtract,
+        0,
+        0,
+        0,
+        0
+      )
+    );
+    const endDate = new Date(
+      Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate(),
+        23,
+        59,
+        59,
+        999
+      )
+    );
 
     // Utiliser sql directement depuis Neon pour les requêtes brutes
     const sqlQuery = neon(process.env.DATABASE_URL!);
 
-    // Récupérer les leads groupés par date
+    // Récupérer les leads groupés par date (UTC pour correspondre à Neon)
     const leadsData = await sqlQuery`
       SELECT 
-        DATE(created_at)::text as date,
+        to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') as date,
         COUNT(*)::int as count
       FROM leads
       WHERE user_id = ${userId}
         AND created_at >= ${startDate.toISOString()}
-      GROUP BY DATE(created_at)
+        AND created_at <= ${endDate.toISOString()}
+      GROUP BY to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD')
       ORDER BY date
     `;
 
-    // Récupérer les companies groupées par date
+    // Récupérer les companies groupées par date (UTC pour correspondre à Neon)
     const companiesData = await sqlQuery`
       SELECT 
-        DATE(created_at)::text as date,
+        to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') as date,
         COUNT(*)::int as count
       FROM companies
       WHERE created_at >= ${startDate.toISOString()}
-      GROUP BY DATE(created_at)
+        AND created_at <= ${endDate.toISOString()}
+      GROUP BY to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD')
       ORDER BY date
     `;
 
@@ -78,7 +96,7 @@ export async function GET(request: NextRequest) {
     while (currentDate <= endDate) {
       const dateStr = currentDate.toISOString().split("T")[0];
       dateArray.push(dateStr);
-      currentDate.setDate(currentDate.getDate() + 1);
+      currentDate.setUTCDate(currentDate.getUTCDate() + 1);
     }
 
     // Combiner les données
@@ -87,12 +105,6 @@ export async function GET(request: NextRequest) {
       leads: leadsMap.get(date) || 0,
       companies: companiesMap.get(date) || 0,
     }));
-
-    // Debug: Afficher les dates générées et la date d'aujourd'hui
-    const todayStr = new Date().toISOString().split("T")[0];
-    console.log("Date d'aujourd'hui:", todayStr);
-    console.log("Dernière date dans chartData:", chartData[chartData.length - 1]?.date);
-    console.log("Nombre total de dates:", chartData.length);
 
     return NextResponse.json(chartData);
   } catch (error) {

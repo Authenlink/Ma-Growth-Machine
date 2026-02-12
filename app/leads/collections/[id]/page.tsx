@@ -11,6 +11,7 @@ import {
   FolderOpen,
   Plus,
   Users,
+  ShieldCheck,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -41,6 +42,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useScroll } from "@/hooks/use-scroll";
 import { EmptyState } from "@/components/empty-state";
+import { DuplicatesCard } from "@/components/leads/duplicates-card";
 import { LeadsFilters } from "@/components/leads/leads-filters";
 import { LeadsCardView } from "@/components/leads/leads-card-view";
 import { LeadsTableView } from "@/components/leads/leads-table-view";
@@ -63,6 +65,7 @@ interface Lead {
   lastName: string | null;
   position: string | null;
   email: string | null;
+  emailVerifyEmaillist?: string | null;
   linkedinUrl: string | null;
   seniority: string | null;
   functional: string | null;
@@ -135,6 +138,7 @@ export default function CollectionDetailPage({ params }: Props) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [leadToDelete, setLeadToDelete] = useState<number | null>(null);
   const [deletingLead, setDeletingLead] = useState(false);
+  const [verifyingEmails, setVerifyingEmails] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -236,6 +240,33 @@ export default function CollectionDetailPage({ params }: Props) {
   const handleDeleteLead = (leadId: number) => {
     setLeadToDelete(leadId);
     setDeleteDialogOpen(true);
+  };
+
+  const handleVerifyEmails = async () => {
+    setVerifyingEmails(true);
+    try {
+      const response = await fetch(`/api/collections/${id}/verify-emails`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ force: false }),
+      });
+      const data = await response.json();
+
+      if (response.ok) {
+        const m = data.metrics || {};
+        toast.success(
+          `Vérification terminée : ${m.updated ?? 0} emails vérifiés (${m.ok ?? 0} délivrables, ${m.invalid ?? 0} invalides, ${m.unknown ?? 0} inconnus)`
+        );
+        fetchCollectionData(currentPage);
+      } else {
+        toast.error(data.error || "Erreur lors de la vérification des emails");
+      }
+    } catch (error) {
+      console.error("Erreur lors de la vérification:", error);
+      toast.error("Erreur de connexion lors de la vérification des emails");
+    } finally {
+      setVerifyingEmails(false);
+    }
   };
 
   const confirmDeleteLead = async () => {
@@ -374,46 +405,52 @@ export default function CollectionDetailPage({ params }: Props) {
           </div>
 
           {/* Informations de la collection */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FolderOpen className="h-5 w-5" />
-                {collectionData.collection.name}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Description</p>
-                  <p className="text-sm font-medium">
-                    {collectionData.collection.description ||
-                      "Aucune description"}
-                  </p>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FolderOpen className="h-5 w-5" />
+                  {collectionData.collection.name}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Description</p>
+                    <p className="text-sm font-medium">
+                      {collectionData.collection.description ||
+                        "Aucune description"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">
+                      Nombre de leads
+                    </p>
+                    <p className="text-sm font-medium flex items-center gap-1">
+                      <Users className="h-4 w-4" />
+                      {collectionData.leads.pagination.totalItems}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Créée le</p>
+                    <p className="text-sm font-medium">
+                      {new Date(
+                        collectionData.collection.createdAt,
+                      ).toLocaleDateString("fr-FR")}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">
-                    Nombre de leads
-                  </p>
-                  <p className="text-sm font-medium flex items-center gap-1">
-                    <Users className="h-4 w-4" />
-                    {collectionData.leads.pagination.totalItems}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Créée le</p>
-                  <p className="text-sm font-medium">
-                    {new Date(
-                      collectionData.collection.createdAt,
-                    ).toLocaleDateString("fr-FR")}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+            <DuplicatesCard
+              collectionId={collectionData.collection.id}
+              onCleaned={() => fetchCollectionData(1)}
+            />
+          </div>
 
           {/* Section leads */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <div>
                 <h2 className="text-xl font-semibold">Leads</h2>
                 <p className="text-muted-foreground">
@@ -424,14 +461,30 @@ export default function CollectionDetailPage({ params }: Props) {
                   dans cette collection
                 </p>
               </div>
-              <Button asChild>
-                <Link
-                  href={`/leads/scrape?collectionId=${collectionData.collection.id}`}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={handleVerifyEmails}
+                  disabled={
+                    verifyingEmails ||
+                    collectionData.leads.pagination.totalItems === 0
+                  }
+                  className="gap-2"
                 >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Ajouter des leads
-                </Link>
-              </Button>
+                  <ShieldCheck className="h-4 w-4" />
+                  {verifyingEmails
+                    ? "Vérification en cours..."
+                    : "Vérifier les emails"}
+                </Button>
+                <Button asChild>
+                  <Link
+                    href={`/leads/scrape?collectionId=${collectionData.collection.id}`}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Ajouter des leads
+                  </Link>
+                </Button>
+              </div>
             </div>
 
             {collectionData.leads.data.length === 0 ? (
@@ -446,7 +499,8 @@ export default function CollectionDetailPage({ params }: Props) {
               <>
                 {filteredLeads.length > 0 && (
                   <LeadsFilters
-                    collections={[]} // Pas besoin de collections ici car on est dans une collection spécifique
+                    collections={[]}
+                    folders={[]}
                     filters={filters}
                     onFiltersChange={setFilters}
                     resultCount={collectionData.leads.pagination.totalItems}

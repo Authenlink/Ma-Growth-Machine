@@ -14,6 +14,7 @@ import {
   Search,
   AlertCircle,
   Pencil,
+  ShieldCheck,
 } from "lucide-react";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
@@ -70,6 +71,8 @@ interface LeadDetail {
   functional: string | null;
   email: string | null;
   emailCertainty: string | null;
+  emailVerifyEmaillist: string | null;
+  emailVerifyEmaillistAt: Date | null;
   personalEmail: string | null;
   phoneNumbers: string[] | null;
   city: string | null;
@@ -119,6 +122,7 @@ export default function LeadDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [findingEmail, setFindingEmail] = useState(false);
+  const [verifyingEmail, setVerifyingEmail] = useState(false);
   const [editSheetOpen, setEditSheetOpen] = useState(false);
 
   const fetchLead = useCallback(async () => {
@@ -243,6 +247,64 @@ export default function LeadDetailPage() {
     } catch {
       return website.replace(/^www\./, "").split("/")[0];
     }
+  };
+
+  const handleVerifyEmail = async () => {
+    if (!lead?.email) return;
+
+    setVerifyingEmail(true);
+    try {
+      const response = await fetch(`/api/leads/${lead.id}/verify-email`, {
+        method: "POST",
+      });
+      const data = await response.json();
+
+      if (response.ok) {
+        toast.success(
+          `Email vérifié : ${data.result}${data.verifiedAt ? ` (${new Date(data.verifiedAt).toLocaleDateString("fr-FR")})` : ""}`
+        );
+        const refreshResponse = await fetch(`/api/leads/${lead.id}`);
+        if (refreshResponse.ok) {
+          const refreshedLead = await refreshResponse.json();
+          setLead(refreshedLead);
+        }
+      } else {
+        toast.error(data.error || "Erreur lors de la vérification de l'email");
+      }
+    } catch (error) {
+      console.error("Erreur lors de la vérification:", error);
+      toast.error("Erreur de connexion lors de la vérification");
+    } finally {
+      setVerifyingEmail(false);
+    }
+  };
+
+  const getEmailVerifyBadgeVariant = (status: string | null) => {
+    if (!status) return "outline";
+    const ok = ["ok", "ok_for_all"];
+    const invalid = ["email_disabled", "dead_server", "invalid_mx", "disposable", "spamtrap", "invalid_syntax"];
+    if (ok.includes(status)) return "success";
+    if (invalid.includes(status)) return "destructive";
+    return "secondary";
+  };
+
+  const getEmailVerifyLabel = (status: string | null) => {
+    if (!status) return null;
+    const labels: Record<string, string> = {
+      ok: "Délivrable",
+      ok_for_all: "Accepte tout",
+      email_disabled: "Désactivé",
+      dead_server: "Serveur mort",
+      invalid_mx: "MX invalide",
+      disposable: "Jetable",
+      spamtrap: "Spamtrap",
+      smtp_protocol: "SMTP inconnu",
+      antispam_system: "Anti-spam",
+      invalid_syntax: "Syntaxe invalide",
+      unknown: "Inconnu",
+      error_credit: "Crédits insuffisants",
+    };
+    return labels[status] || status;
   };
 
   if (status === "loading" || loading) {
@@ -474,8 +536,8 @@ export default function LeadDetailPage() {
                     </div>
                   )}
                   {lead.email && (
-                    <div className="mt-4 flex items-center gap-2">
-                      <Mail className="h-4 w-4 text-muted-foreground" />
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                      <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
                       <a
                         href={`mailto:${lead.email}`}
                         className="text-sm font-medium text-primary hover:underline"
@@ -487,6 +549,30 @@ export default function LeadDetailPage() {
                           {lead.emailCertainty}
                         </Badge>
                       )}
+                      {lead.emailVerifyEmaillist && (
+                        <Badge
+                          variant={getEmailVerifyBadgeVariant(lead.emailVerifyEmaillist) as "outline" | "secondary" | "destructive" | "success"}
+                          className="text-xs gap-1"
+                        >
+                          <ShieldCheck className="h-3 w-3" />
+                          {getEmailVerifyLabel(lead.emailVerifyEmaillist)}
+                          {lead.emailVerifyEmaillistAt && (
+                            <span className="text-muted-foreground font-normal">
+                              ({new Date(lead.emailVerifyEmaillistAt).toLocaleDateString("fr-FR")})
+                            </span>
+                          )}
+                        </Badge>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleVerifyEmail}
+                        disabled={verifyingEmail}
+                        className="gap-1"
+                      >
+                        <ShieldCheck className="h-3 w-3" />
+                        {verifyingEmail ? "Vérification..." : "Vérifier l'email"}
+                      </Button>
                     </div>
                   )}
                 </div>

@@ -9,6 +9,7 @@ import {
   mapLeadPostsToDB,
   LinkedInPostData,
 } from "@/lib/linkedin-posts-mapper";
+import { recordScraperRun } from "@/lib/scraper-runs";
 
 // Timeout maximum pour un run (30 minutes)
 const MAX_RUN_TIMEOUT = 30 * 60 * 1000;
@@ -229,6 +230,21 @@ export async function POST(
 
       console.error(`[Enrichment] Erreur pour run ${runId}:`, errorMessage);
 
+      try {
+        await recordScraperRun({
+          runId: run.id,
+          scraperId,
+          userId,
+          source: "enrich_lead",
+          leadId,
+          itemCount: 0,
+          status: runStatus.status,
+          fetchCostFromApify: true,
+        });
+      } catch {
+        /* ignore */
+      }
+
       return NextResponse.json(
         {
           error: errorMessage,
@@ -295,6 +311,21 @@ export async function POST(
       .update(leads)
       .set(updateData)
       .where(eq(leads.id, leadId));
+
+    try {
+      await recordScraperRun({
+        runId: run.id,
+        scraperId,
+        userId,
+        source: "enrich_lead",
+        leadId,
+        itemCount: items.length,
+        status: runStatus.status,
+        fetchCostFromApify: true,
+      });
+    } catch {
+      /* ignore */
+    }
 
     const duration = Math.round((Date.now() - startTime) / 1000);
 

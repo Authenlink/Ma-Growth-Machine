@@ -56,6 +56,8 @@ import {
   X,
   Trash2,
   Upload,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 
@@ -81,6 +83,57 @@ const TikTokIcon = ({ className }: { className?: string }) => (
     <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z" />
   </svg>
 );
+
+function BackfillRunsButton() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [resetBefore, setResetBefore] = useState(true);
+  const handleBackfill = async () => {
+    try {
+      setIsLoading(true);
+      const params = new URLSearchParams({ days: "90" });
+      if (resetBefore) params.set("reset", "1");
+      const res = await fetch(`/api/scraper-runs/backfill?${params}`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur");
+      toast.success("Import terminé", {
+        description: data.message,
+      });
+    } catch (err) {
+      toast.error("Erreur", {
+        description: err instanceof Error ? err.message : "Impossible d'importer les runs",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          id="reset-before"
+          checked={resetBefore}
+          onChange={(e) => setResetBefore(e.target.checked)}
+          className="h-4 w-4 rounded border-gray-300"
+        />
+        <Label htmlFor="reset-before" className="text-sm cursor-pointer">
+          Réinitialiser l&apos;import précédent avant d&apos;importer
+        </Label>
+      </div>
+      <Button onClick={handleBackfill} disabled={isLoading} variant="outline">
+        {isLoading ? (
+          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+        ) : (
+          <Sparkles className="h-4 w-4 mr-2" />
+        )}
+        {isLoading ? "Import en cours..." : "Importer les 3 derniers mois"}
+      </Button>
+    </div>
+  );
+}
 
 const LinkedInIcon = ({ className }: { className?: string }) => (
   <svg
@@ -823,6 +876,23 @@ export default function UserProfilePage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Backfill runs Apify */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5" />
+                Historique des dépenses Apify
+              </CardTitle>
+              <CardDescription>
+                Importe les runs Apify du dernier mois pour compléter ton historique de coûts.
+                Les runs déjà enregistrés sont ignorés.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <BackfillRunsButton />
+            </CardContent>
+          </Card>
 
           {/* Action Buttons */}
           {isEditing && (

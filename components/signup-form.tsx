@@ -29,6 +29,7 @@ export function SignupForm({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [registrationSecret, setRegistrationSecret] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -37,6 +38,11 @@ export function SignupForm({
     setError(null);
 
     // Validation cote client
+    if (!registrationSecret) {
+      setError("Le mot de passe d'inscription est requis");
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError("Les mots de passe ne correspondent pas");
       return;
@@ -54,7 +60,7 @@ export function SignupForm({
       const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email, password, registrationSecret }),
       });
 
       const data = await response.json();
@@ -74,7 +80,7 @@ export function SignupForm({
 
       if (signInResult?.error) {
         setError(
-          "Compte cree mais echec de connexion. Veuillez essayer de vous connecter."
+          "Compte cree mais echec de connexion. Veuillez essayer de vous connecter.",
         );
         setIsLoading(false);
         return;
@@ -109,6 +115,21 @@ export function SignupForm({
                   </div>
                 </Field>
               )}
+
+              <Field>
+                <FieldLabel htmlFor="registration-secret">
+                  Mot de passe d&apos;inscription
+                </FieldLabel>
+                <Input
+                  id="registration-secret"
+                  type="password"
+                  placeholder="Mot de passe requis pour creer un compte"
+                  value={registrationSecret}
+                  onChange={(e) => setRegistrationSecret(e.target.value)}
+                  required
+                  disabled={isLoading}
+                />
+              </Field>
 
               <Field>
                 <FieldLabel htmlFor="name">Nom complet</FieldLabel>

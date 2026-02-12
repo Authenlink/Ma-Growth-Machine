@@ -3,7 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Button } from "@/components/ui/button";
@@ -33,13 +33,54 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useScroll } from "@/hooks/use-scroll";
 
+interface Folder {
+  id: number;
+  name: string;
+  description: string | null;
+}
+
 export default function NewCollectionPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const hasScrolled = useScroll();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [folderId, setFolderId] = useState<number | "">("");
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [loadingFolders, setLoadingFolders] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchFolders = async () => {
+      if (status === "authenticated") {
+        try {
+          const response = await fetch("/api/folders");
+          if (response.ok) {
+            const data = await response.json();
+            const folderList = data.map(
+              (f: { id: number; name: string; description: string | null }) => ({
+                id: f.id,
+                name: f.name,
+                description: f.description,
+              }),
+            );
+            setFolders(folderList);
+            if (folderList.length > 0 && folderId === "") {
+              const defaultFolder = folderList.find(
+                (f: Folder) => f.name === "Default",
+              );
+              setFolderId(defaultFolder?.id ?? folderList[0].id);
+            }
+          }
+        } catch (error) {
+          console.error("Erreur lors de la récupération des dossiers:", error);
+        } finally {
+          setLoadingFolders(false);
+        }
+      }
+    };
+    fetchFolders();
+  }, [status]);
 
   if (status === "unauthenticated") {
     router.push("/login");
@@ -59,6 +100,7 @@ export default function NewCollectionPage() {
         body: JSON.stringify({
           name: name.trim(),
           description: description.trim() || null,
+          folderId: folderId !== "" ? folderId : undefined,
         }),
       });
 
@@ -139,6 +181,30 @@ export default function NewCollectionPage() {
             <CardContent>
               <form onSubmit={handleSubmit}>
                 <FieldGroup>
+                  <Field>
+                    <FieldLabel htmlFor="folderId">Dossier</FieldLabel>
+                    <select
+                      id="folderId"
+                      value={folderId}
+                      onChange={(e) =>
+                        setFolderId(
+                          e.target.value ? parseInt(e.target.value) : "",
+                        )
+                      }
+                      disabled={isLoading || loadingFolders}
+                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+                    >
+                      {loadingFolders ? (
+                        <option>Chargement...</option>
+                      ) : (
+                        folders.map((folder) => (
+                          <option key={folder.id} value={folder.id}>
+                            {folder.name}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </Field>
                   <Field>
                     <FieldLabel htmlFor="name">
                       Nom de la collection *

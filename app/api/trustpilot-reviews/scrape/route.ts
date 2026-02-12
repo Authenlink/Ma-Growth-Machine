@@ -6,6 +6,7 @@ import { eq, and } from "drizzle-orm";
 import { extractDomain } from "@/lib/bulk-email-finder-mapper";
 import { runTrustpilotScraper } from "@/lib/trustpilot-reviews-service";
 import { mapTrustpilotReviewsToDb } from "@/lib/trustpilot-reviews-mapper";
+import { recordScraperRun } from "@/lib/scraper-runs";
 
 const DELAY_BETWEEN_REQUESTS_MS = 1500;
 const TRUSTPILOT_REVIEW_BASE_URL = "https://www.trustpilot.com/review/";
@@ -224,8 +225,27 @@ export async function POST(request: NextRequest) {
       const startUrl = `${TRUSTPILOT_REVIEW_BASE_URL}${domain}`;
 
       try {
-        const items = await runTrustpilotScraper([startUrl], maxItems);
+        const { items, runId, usageTotalUsd, status } = await runTrustpilotScraper(
+          [startUrl],
+          maxItems
+        );
         const result = await mapTrustpilotReviewsToDb(items, cid);
+
+        try {
+          await recordScraperRun({
+            runId,
+            scraperId: null,
+            userId,
+            source: "trustpilot",
+            companyId: cid,
+            itemCount: items.length,
+            status,
+            costUsd: usageTotalUsd ?? null,
+            fetchCostFromApify: false,
+          });
+        } catch {
+          /* ignore */
+        }
 
         totalCreated += result.created;
         totalSkipped += result.skipped;

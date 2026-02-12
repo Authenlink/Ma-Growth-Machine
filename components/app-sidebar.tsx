@@ -9,8 +9,6 @@ import {
   Building2,
   FolderOpen,
   Zap,
-  Target,
-  MessageSquare,
   Settings,
   Sparkles,
 } from "lucide-react";
@@ -77,31 +75,32 @@ const navItems = [
     items: [
       { title: "Enrichir leads", url: "/enrichment?tab=lead" },
       { title: "Enrichir entreprise", url: "/enrichment?tab=company" },
+      { title: "Vérifier emails", url: "/enrichment?tab=verify-emails" },
       { title: "Analyse SEO", url: "/enrichment/seo" },
       { title: "Avis Trustpilot", url: "/enrichment/trustpilot" },
     ],
   },
-  {
-    title: "Campagnes",
-    url: "/campaigns",
-    icon: Target,
-    items: [
-      { title: "Toutes les campagnes", url: "/campaigns" },
-      { title: "Nouvelle campagne", url: "/campaigns/new" },
-      { title: "Rapports", url: "/campaigns/reports" },
-      { title: "Performances", url: "/campaigns/analytics" },
-    ],
-  },
-  {
-    title: "IceBreakers",
-    url: "/icebreakers",
-    icon: MessageSquare,
-    items: [
-      { title: "Générer pour liste", url: "/icebreakers/generate" },
-      { title: "Templates", url: "/icebreakers/templates" },
-      { title: "Historique", url: "/icebreakers/history" },
-    ],
-  },
+  // {
+  //   title: "Campagnes",
+  //   url: "/campaigns",
+  //   icon: Target,
+  //   items: [
+  //     { title: "Toutes les campagnes", url: "/campaigns" },
+  //     { title: "Nouvelle campagne", url: "/campaigns/new" },
+  //     { title: "Rapports", url: "/campaigns/reports" },
+  //     { title: "Performances", url: "/campaigns/analytics" },
+  //   ],
+  // },
+  // {
+  //   title: "IceBreakers",
+  //   url: "/icebreakers",
+  //   icon: MessageSquare,
+  //   items: [
+  //     { title: "Générer pour liste", url: "/icebreakers/generate" },
+  //     { title: "Templates", url: "/icebreakers/templates" },
+  //     { title: "Historique", url: "/icebreakers/history" },
+  //   ],
+  // },
   {
     title: "Actions",
     url: "/actions",

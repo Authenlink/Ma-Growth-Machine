@@ -8,6 +8,7 @@ import {
   mapCompanyPostsToDB,
   LinkedInPostData,
 } from "@/lib/linkedin-posts-mapper";
+import { recordScraperRun } from "@/lib/scraper-runs";
 
 // Timeout maximum pour un run (30 minutes)
 const MAX_RUN_TIMEOUT = 30 * 60 * 1000;
@@ -194,6 +195,21 @@ export async function POST(
 
       console.error(`[Enrichment Company] Erreur pour run ${run.id}:`, errorMessage);
 
+      try {
+        await recordScraperRun({
+          runId: run.id,
+          scraperId,
+          userId,
+          source: "enrich_company",
+          companyId,
+          itemCount: 0,
+          status: runStatus.status,
+          fetchCostFromApify: true,
+        });
+      } catch {
+        /* ignore */
+      }
+
       return NextResponse.json(
         {
           error: errorMessage,
@@ -242,6 +258,21 @@ export async function POST(
       `${mappingResult.created} posts créés, ${mappingResult.skipped} ignorés, ${mappingResult.errors} erreurs`,
       `(statut: ${newStatus})`
     );
+
+    try {
+      await recordScraperRun({
+        runId: run.id,
+        scraperId,
+        userId,
+        source: "enrich_company",
+        companyId,
+        itemCount: items.length,
+        status: runStatus.status,
+        fetchCostFromApify: true,
+      });
+    } catch {
+      /* ignore */
+    }
 
     return NextResponse.json({
       success: true,

@@ -20,6 +20,8 @@ interface SocialMediaTabProps {
   leadPosts?: LinkedInPost[];
   companyName?: string | null;
   personName?: string | null;
+  /** Message personnalisé quand vide (ex: "pour cette entreprise" sur la page company) */
+  emptyContext?: string;
 }
 
 export function SocialMediaTab({
@@ -27,6 +29,7 @@ export function SocialMediaTab({
   leadPosts = [],
   companyName,
   personName,
+  emptyContext = "pour ce lead",
 }: SocialMediaTabProps) {
   const hasContent = companyPosts.length > 0 || leadPosts.length > 0;
 
@@ -36,7 +39,7 @@ export function SocialMediaTab({
         <Linkedin className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
         <h3 className="text-lg font-medium mb-2">Aucun contenu LinkedIn</h3>
         <p className="text-muted-foreground">
-          Aucun post LinkedIn n'est disponible pour ce lead.
+          Aucun post LinkedIn n&apos;est disponible {emptyContext}.
         </p>
       </div>
     );

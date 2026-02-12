@@ -36,6 +36,7 @@ interface Company {
   size: string | null;
   description: string | null;
   specialities: string[] | null;
+  technologies: string | null;
   city: string | null;
   state: string | null;
   country: string | null;
@@ -127,11 +128,11 @@ export default function CompaniesPage() {
         </header>
 
         <div className="flex flex-1 flex-col gap-4 p-4 pt-6 overflow-x-hidden">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-2">
             <div>
-              <h1 className="text-2xl font-bold">Entreprises</h1>
-              <p className="text-muted-foreground">
-                Gérez votre base de données d&apos;entreprises.
+              <h1 className="text-2xl font-bold tracking-tight">Entreprises</h1>
+              <p className="text-muted-foreground mt-1">
+                Gérez votre base de données d&apos;entreprises et leurs technos.
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -142,7 +143,7 @@ export default function CompaniesPage() {
                 className="gap-2"
               >
                 <LayoutGrid className="h-4 w-4" />
-                Cards
+                Cartes
               </Button>
               <Button
                 variant={viewMode === "table" ? "default" : "outline"}
@@ -151,7 +152,7 @@ export default function CompaniesPage() {
                 className="gap-2"
               >
                 <Table2 className="h-4 w-4" />
-                Table
+                Tableau
               </Button>
             </div>
           </div>

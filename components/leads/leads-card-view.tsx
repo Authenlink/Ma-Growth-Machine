@@ -15,6 +15,7 @@ interface Lead {
   lastName: string | null;
   position: string | null;
   email: string | null;
+  emailVerifyEmaillist?: string | null;
   linkedinUrl: string | null;
   seniority: string | null;
   functional: string | null;
@@ -179,7 +180,7 @@ export function LeadsCardView({ leads, onDeleteLead }: LeadsCardViewProps) {
                   {/* Contact */}
                   <div className="space-y-1.5">
                     {lead.email && (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
                         <button
                           onClick={(e) => {
@@ -190,6 +191,26 @@ export function LeadsCardView({ leads, onDeleteLead }: LeadsCardViewProps) {
                         >
                           {lead.email}
                         </button>
+                        {lead.emailVerifyEmaillist && (
+                          <Badge
+                            variant={
+                              ["ok", "ok_for_all"].includes(lead.emailVerifyEmaillist)
+                                ? "success"
+                                : ["email_disabled", "dead_server", "invalid_mx", "disposable", "spamtrap"].includes(
+                                    lead.emailVerifyEmaillist
+                                  )
+                                  ? "destructive"
+                                  : "secondary"
+                            }
+                            className="text-[10px] px-1.5 py-0"
+                          >
+                            {lead.emailVerifyEmaillist === "ok"
+                              ? "OK"
+                              : lead.emailVerifyEmaillist === "email_disabled"
+                                ? "Invalide"
+                                : lead.emailVerifyEmaillist}
+                          </Badge>
+                        )}
                       </div>
                     )}
                     {lead.linkedinUrl && (

@@ -4,7 +4,15 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Zap, FolderOpen, Users, User, Building2, AlertCircle } from "lucide-react";
+import {
+  Zap,
+  FolderOpen,
+  Users,
+  User,
+  Building2,
+  AlertCircle,
+  ShieldCheck,
+} from "lucide-react";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
   Breadcrumb,
@@ -26,10 +34,23 @@ import { useScroll } from "@/hooks/use-scroll";
 import { EmptyState } from "@/components/empty-state";
 import { EnrichmentForm } from "@/components/enrichment/enrichment-form";
 import { EnrichAllForm } from "@/components/enrichment/enrich-all-form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Combobox } from "@/components/ui/combobox";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+
+interface PricingTier {
+  name: string;
+  costPerThousand: number;
+  costPerLead: number;
+}
 
 interface Scraper {
   id: number;
@@ -37,6 +58,12 @@ interface Scraper {
   description: string | null;
   provider: string;
   mapperType?: string;
+  paymentType?: string | null;
+  costPerThousand?: number | null;
+  costPerLead?: number | null;
+  actorStartCost?: number | null;
+  freeQuotaMonthly?: number | null;
+  pricingTiers?: PricingTier[] | null;
 }
 
 interface Collection {
@@ -50,6 +77,7 @@ interface Lead {
   fullName: string | null;
   firstName: string | null;
   lastName: string | null;
+  email: string | null;
   linkedinUrl: string | null;
   companyLinkedinPost: string | null;
   personLinkedinPost: string | null;
@@ -75,20 +103,31 @@ export default function EnrichmentPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [scrapers, setScrapers] = useState<Scraper[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedCollectionId, setSelectedCollectionId] = useState<number | null>(null);
+  const [selectedCollectionId, setSelectedCollectionId] = useState<
+    number | null
+  >(null);
   const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(null);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(
+    null,
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submittingScrapers, setSubmittingScrapers] = useState<Set<number>>(new Set());
-  const [collectionLeads, setCollectionLeads] = useState<Array<{
-    id: number;
-    linkedinUrl: string | null;
-    company: { linkedinUrl: string | null } | null;
-  }>>([]);
+  const [submittingScrapers, setSubmittingScrapers] = useState<Set<number>>(
+    new Set(),
+  );
+  const [verifyingEmails, setVerifyingEmails] = useState(false);
+  const [collectionLeads, setCollectionLeads] = useState<
+    Array<{
+      id: number;
+      linkedinUrl: string | null;
+      company: { linkedinUrl: string | null } | null;
+    }>
+  >([]);
   const [loadingCollectionLeads, setLoadingCollectionLeads] = useState(false);
-  
+
   // Récupérer le paramètre tab depuis l'URL
-  const [activeTab, setActiveTab] = useState<"lead" | "company" | "collection">("lead");
+  const [activeTab, setActiveTab] = useState<
+    "lead" | "company" | "collection" | "verify-emails"
+  >("lead");
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -101,7 +140,12 @@ export default function EnrichmentPage() {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const tab = params.get("tab");
-      if (tab === "lead" || tab === "company" || tab === "collection") {
+      if (
+        tab === "lead" ||
+        tab === "company" ||
+        tab === "collection" ||
+        tab === "verify-emails"
+      ) {
         setActiveTab(tab);
       }
     }
@@ -121,11 +165,14 @@ export default function EnrichmentPage() {
               (s: Scraper) =>
                 s.mapperType === "linkedin-company-posts" ||
                 s.mapperType === "linkedin-profile-posts" ||
-                (s.name.includes("LinkedIn") && s.name.includes("Posts"))
+                (s.name.includes("LinkedIn") && s.name.includes("Posts")),
             );
             setScrapers(enrichmentScrapers);
           } else {
-            console.error("Erreur lors de la récupération des scrapers:", scrapersResponse.status);
+            console.error(
+              "Erreur lors de la récupération des scrapers:",
+              scrapersResponse.status,
+            );
           }
 
           // Récupérer les collections
@@ -135,11 +182,11 @@ export default function EnrichmentPage() {
             setCollections(collectionsData);
           }
 
-          // Récupérer les leads
-          const leadsResponse = await fetch("/api/leads");
+          // Récupérer tous les leads (limite élevée pour les listes déroulantes)
+          const leadsResponse = await fetch("/api/leads?limit=5000");
           if (leadsResponse.ok) {
             const leadsData = await leadsResponse.json();
-            setLeads(leadsData.data);
+            setLeads(leadsData.data || []);
           }
 
           // Récupérer les entreprises
@@ -166,13 +213,18 @@ export default function EnrichmentPage() {
       if (selectedCollectionId && status === "authenticated") {
         setLoadingCollectionLeads(true);
         try {
-          const response = await fetch(`/api/collections/${selectedCollectionId}/leads`);
+          const response = await fetch(
+            `/api/collections/${selectedCollectionId}/leads`,
+          );
           if (response.ok) {
             const data = await response.json();
             setCollectionLeads(data.data || []);
           }
         } catch (error) {
-          console.error("Erreur lors de la récupération des leads de la collection:", error);
+          console.error(
+            "Erreur lors de la récupération des leads de la collection:",
+            error,
+          );
         } finally {
           setLoadingCollectionLeads(false);
         }
@@ -209,7 +261,7 @@ export default function EnrichmentPage() {
 
       if (response.ok) {
         toast.success(
-          `Enrichissement réussi ! ${result.metrics.created} posts créés.`
+          `Enrichissement réussi ! ${result.metrics.created} posts créés.`,
         );
         // Rafraîchir les données
         const leadsResponse = await fetch("/api/leads");
@@ -248,19 +300,22 @@ export default function EnrichmentPage() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(`/api/collections/${selectedCollectionId}/enrich`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        `/api/collections/${selectedCollectionId}/enrich`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(data),
         },
-        body: JSON.stringify(data),
-      });
+      );
 
       const result = await response.json();
 
       if (response.ok) {
         toast.success(
-          `Enrichissement terminé pour ${scrapers.find(s => s.id === data.scraperId)?.name || 'scraper'} ! ${result.metrics.enriched} leads enrichis, ${result.metrics.skipped} ignorés.`
+          `Enrichissement terminé pour ${scrapers.find((s) => s.id === data.scraperId)?.name || "scraper"} ! ${result.metrics.enriched} leads enrichis, ${result.metrics.skipped} ignorés.`,
         );
         // Rafraîchir les données
         const leadsResponse = await fetch("/api/leads");
@@ -304,7 +359,7 @@ export default function EnrichmentPage() {
     }
 
     setIsSubmitting(true);
-    setSubmittingScrapers(new Set(collectionScrapers.map(s => s.id)));
+    setSubmittingScrapers(new Set(collectionScrapers.map((s) => s.id)));
 
     try {
       // Lancer tous les scrapers en parallèle
@@ -321,7 +376,7 @@ export default function EnrichmentPage() {
         }).then(async (response) => {
           const result = await response.json();
           return { scraper, response, result };
-        })
+        }),
       );
 
       const results = await Promise.allSettled(promises);
@@ -335,7 +390,7 @@ export default function EnrichmentPage() {
           if (response.ok) {
             successCount++;
             toast.success(
-              `${scraper.name} : ${data.metrics.enriched} leads enrichis`
+              `${scraper.name} : ${data.metrics.enriched} leads enrichis`,
             );
           } else {
             errorCount++;
@@ -344,7 +399,7 @@ export default function EnrichmentPage() {
         } else {
           errorCount++;
           toast.error(
-            `${collectionScrapers[index].name} : Erreur lors de l'enrichissement`
+            `${collectionScrapers[index].name} : Erreur lors de l'enrichissement`,
           );
         }
       });
@@ -361,7 +416,9 @@ export default function EnrichmentPage() {
       if (successCount === collectionScrapers.length) {
         toast.success("Tous les enrichissements sont terminés avec succès !");
       } else if (errorCount > 0) {
-        toast.warning(`${successCount} enrichissement(s) réussi(s), ${errorCount} erreur(s)`);
+        toast.warning(
+          `${successCount} enrichissement(s) réussi(s), ${errorCount} erreur(s)`,
+        );
       }
     } catch (error) {
       console.error("Erreur:", error);
@@ -369,6 +426,76 @@ export default function EnrichmentPage() {
     } finally {
       setIsSubmitting(false);
       setSubmittingScrapers(new Set());
+    }
+  };
+
+  const handleVerifyLeadEmail = async () => {
+    if (!selectedLeadId) {
+      toast.error("Veuillez sélectionner un lead");
+      return;
+    }
+    const lead = leads.find((l) => l.id === selectedLeadId);
+    if (!lead) return;
+    // On utilise l'API leads pour récupérer l'email - les leads dans la liste peuvent ne pas avoir l'email
+    setVerifyingEmails(true);
+    try {
+      const response = await fetch(
+        `/api/leads/${selectedLeadId}/verify-email`,
+        { method: "POST" },
+      );
+      const data = await response.json();
+      if (response.ok) {
+        toast.success(`Email vérifié : ${data.result}`);
+        const leadsResponse = await fetch("/api/leads");
+        if (leadsResponse.ok) {
+          const leadsData = await leadsResponse.json();
+          setLeads(leadsData.data);
+        }
+      } else {
+        toast.error(data.error || "Erreur lors de la vérification");
+      }
+    } catch (error) {
+      console.error("Erreur:", error);
+      toast.error("Erreur lors de la vérification");
+    } finally {
+      setVerifyingEmails(false);
+    }
+  };
+
+  const handleVerifyCollectionEmails = async () => {
+    if (!selectedCollectionId) {
+      toast.error("Veuillez sélectionner une collection");
+      return;
+    }
+    setVerifyingEmails(true);
+    try {
+      const response = await fetch(
+        `/api/collections/${selectedCollectionId}/verify-emails`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ force: false }),
+        },
+      );
+      const data = await response.json();
+      if (response.ok) {
+        const m = data.metrics || {};
+        toast.success(
+          `Vérification terminée : ${m.updated ?? 0} emails vérifiés (${m.ok ?? 0} délivrables, ${m.invalid ?? 0} invalides)`,
+        );
+        const leadsResponse = await fetch("/api/leads");
+        if (leadsResponse.ok) {
+          const leadsData = await leadsResponse.json();
+          setLeads(leadsData.data);
+        }
+      } else {
+        toast.error(data.error || "Erreur lors de la vérification");
+      }
+    } catch (error) {
+      console.error("Erreur:", error);
+      toast.error("Erreur lors de la vérification");
+    } finally {
+      setVerifyingEmails(false);
     }
   };
 
@@ -385,19 +512,22 @@ export default function EnrichmentPage() {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch(`/api/companies/${selectedCompanyId}/enrich`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        `/api/companies/${selectedCompanyId}/enrich`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(data),
         },
-        body: JSON.stringify(data),
-      });
+      );
 
       const result = await response.json();
 
       if (response.ok) {
         toast.success(
-          `Enrichissement réussi ! ${result.metrics.created} posts créés pour ${result.metrics.leadsUpdated} leads.`
+          `Enrichissement réussi ! ${result.metrics.created} posts créés pour ${result.metrics.leadsUpdated} leads.`,
         );
         // Rafraîchir les données
         const leadsResponse = await fetch("/api/leads");
@@ -445,23 +575,29 @@ export default function EnrichmentPage() {
   }
 
   // Filtrer les scrapers selon le type
-  const getScrapersForContext = (context: "lead" | "company" | "collection") => {
+  const getScrapersForContext = (
+    context: "lead" | "company" | "collection",
+  ) => {
     const allEnrichmentScrapers = scrapers.filter(
       (s) =>
         s.mapperType === "linkedin-company-posts" ||
         s.mapperType === "linkedin-profile-posts" ||
-        (s.name.includes("LinkedIn") && s.name.includes("Posts"))
+        (s.name.includes("LinkedIn") && s.name.includes("Posts")),
     );
 
     if (context === "lead") {
       // Pour un lead, seulement les posts de profil (linkedin-profile-posts)
-      return allEnrichmentScrapers.filter((s) =>
-        s.mapperType === "linkedin-profile-posts" || s.name.includes("Profile")
+      return allEnrichmentScrapers.filter(
+        (s) =>
+          s.mapperType === "linkedin-profile-posts" ||
+          s.name.includes("Profile"),
       );
     } else if (context === "company") {
       // Pour une entreprise, seulement les posts d'entreprise (linkedin-company-posts)
-      return allEnrichmentScrapers.filter((s) =>
-        s.mapperType === "linkedin-company-posts" || s.name.includes("Company")
+      return allEnrichmentScrapers.filter(
+        (s) =>
+          s.mapperType === "linkedin-company-posts" ||
+          s.name.includes("Company"),
       );
     } else {
       // Pour une collection, les deux types
@@ -523,7 +659,15 @@ export default function EnrichmentPage() {
               icon={Zap}
             />
           ) : (
-            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "lead" | "company" | "collection")} className="w-full">
+            <Tabs
+              value={activeTab}
+              onValueChange={(value) =>
+                setActiveTab(
+                  value as "lead" | "company" | "collection" | "verify-emails",
+                )
+              }
+              className="w-full"
+            >
               <TabsList>
                 <TabsTrigger value="lead">
                   <User className="mr-2 h-4 w-4" />
@@ -537,32 +681,44 @@ export default function EnrichmentPage() {
                   <Users className="mr-2 h-4 w-4" />
                   Enrichir une collection
                 </TabsTrigger>
+                <TabsTrigger value="verify-emails">
+                  <ShieldCheck className="mr-2 h-4 w-4" />
+                  Vérifier emails
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="lead" className="space-y-4 mt-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Sélectionner un lead</label>
+                  <label className="text-sm font-medium">
+                    Sélectionner un lead
+                  </label>
                   <Combobox
                     options={leads.map((lead) => {
                       const displayName =
                         lead.fullName ||
                         (lead.firstName && lead.lastName
                           ? `${lead.firstName} ${lead.lastName}`
-                          : lead.firstName || lead.lastName || `Lead #${lead.id}`);
+                          : lead.firstName ||
+                            lead.lastName ||
+                            `Lead #${lead.id}`);
                       return {
                         value: lead.id.toString(),
                         label: `${displayName}${lead.company ? ` - ${lead.company.name}` : ""}`,
                       };
                     })}
                     value={selectedLeadId?.toString()}
-                    onValueChange={(value) => setSelectedLeadId(value ? parseInt(value) : null)}
+                    onValueChange={(value) =>
+                      setSelectedLeadId(value ? parseInt(value) : null)
+                    }
                     placeholder="Rechercher un lead..."
                     searchPlaceholder="Tapez pour rechercher..."
                     emptyMessage="Aucun lead trouvé"
                     filterFunction={(option, search) => {
                       if (!search) return true;
                       const searchLower = search.toLowerCase();
-                      const lead = leads.find((l) => l.id.toString() === option.value);
+                      const lead = leads.find(
+                        (l) => l.id.toString() === option.value,
+                      );
                       if (!lead) return false;
                       const fullName =
                         lead.fullName ||
@@ -572,53 +728,71 @@ export default function EnrichmentPage() {
                       const companyName = lead.company?.name || "";
                       return (
                         fullName.toLowerCase().includes(searchLower) ||
-                        (lead.firstName && lead.firstName.toLowerCase().includes(searchLower)) ||
-                        (lead.lastName && lead.lastName.toLowerCase().includes(searchLower)) ||
+                        (lead.firstName &&
+                          lead.firstName.toLowerCase().includes(searchLower)) ||
+                        (lead.lastName &&
+                          lead.lastName.toLowerCase().includes(searchLower)) ||
                         companyName.toLowerCase().includes(searchLower)
                       );
                     }}
                   />
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Badge variant="outline" className="text-xs">
-                      {leads.filter((l) => l.linkedinUrl).length} leads éligibles sur {leads.length} total
+                      {leads.filter((l) => l.linkedinUrl).length} leads
+                      éligibles sur {leads.length} total
                     </Badge>
                   </div>
                 </div>
 
-                {selectedLeadId && (() => {
-                  const selectedLead = leads.find((l) => l.id === selectedLeadId);
-                  const leadsScrapers = getScrapersForContext("lead");
-                  
-                  return (
-                    <div className="grid gap-4 md:grid-cols-1">
-                      {leadsScrapers.map((scraper) => {
-                        const isProfilePostsScraper = scraper.mapperType === "linkedin-profile-posts";
-                        const hasLinkedinUrl = selectedLead?.linkedinUrl != null;
-                        const canEnrich = !isProfilePostsScraper || hasLinkedinUrl;
-                        const warningMessage = isProfilePostsScraper && !hasLinkedinUrl
-                          ? "Ce lead n'a pas d'URL LinkedIn et ne peut pas être enrichi avec des posts de profil"
-                          : undefined;
+                {selectedLeadId &&
+                  (() => {
+                    const selectedLead = leads.find(
+                      (l) => l.id === selectedLeadId,
+                    );
+                    const leadsScrapers = getScrapersForContext("lead");
 
-                        return (
-                          <EnrichmentForm
-                            key={scraper.id}
-                            scraperId={scraper.id}
-                            scraperName={scraper.name}
-                            onSubmit={handleEnrichLead}
-                            isSubmitting={isSubmitting}
-                            disabled={!canEnrich}
-                            warningMessage={warningMessage}
-                          />
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
+                    return (
+                      <div className="grid gap-4 md:grid-cols-1">
+                        {leadsScrapers.map((scraper) => {
+                          const isProfilePostsScraper =
+                            scraper.mapperType === "linkedin-profile-posts";
+                          const hasLinkedinUrl =
+                            selectedLead?.linkedinUrl != null;
+                          const canEnrich =
+                            !isProfilePostsScraper || hasLinkedinUrl;
+                          const warningMessage =
+                            isProfilePostsScraper && !hasLinkedinUrl
+                              ? "Ce lead n'a pas d'URL LinkedIn et ne peut pas être enrichi avec des posts de profil"
+                              : undefined;
+
+                          return (
+                            <EnrichmentForm
+                              key={scraper.id}
+                              scraperId={scraper.id}
+                              scraperName={scraper.name}
+                              onSubmit={handleEnrichLead}
+                              isSubmitting={isSubmitting}
+                              disabled={!canEnrich}
+                              warningMessage={warningMessage}
+                              paymentType={scraper.paymentType}
+                              costPerThousand={scraper.costPerThousand}
+                              costPerLead={scraper.costPerLead}
+                              actorStartCost={scraper.actorStartCost}
+                              freeQuotaMonthly={scraper.freeQuotaMonthly}
+                              pricingTiers={scraper.pricingTiers}
+                            />
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
               </TabsContent>
 
               <TabsContent value="company" className="space-y-4 mt-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Sélectionner une entreprise</label>
+                  <label className="text-sm font-medium">
+                    Sélectionner une entreprise
+                  </label>
                   <Combobox
                     options={companies
                       .filter((company) => company.linkedinUrl)
@@ -627,20 +801,28 @@ export default function EnrichmentPage() {
                         label: company.name,
                       }))}
                     value={selectedCompanyId?.toString()}
-                    onValueChange={(value) => setSelectedCompanyId(value ? parseInt(value) : null)}
+                    onValueChange={(value) =>
+                      setSelectedCompanyId(value ? parseInt(value) : null)
+                    }
                     placeholder="Rechercher une entreprise..."
                     searchPlaceholder="Tapez pour rechercher..."
                     emptyMessage="Aucune entreprise trouvée"
                     filterFunction={(option, search) => {
                       if (!search) return true;
                       const searchLower = search.toLowerCase();
-                      const company = companies.find((c) => c.id.toString() === option.value);
-                      return company?.name.toLowerCase().includes(searchLower) || false;
+                      const company = companies.find(
+                        (c) => c.id.toString() === option.value,
+                      );
+                      return (
+                        company?.name.toLowerCase().includes(searchLower) ||
+                        false
+                      );
                     }}
                   />
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Badge variant="outline" className="text-xs">
-                      {companies.filter((c) => c.linkedinUrl).length} entreprises éligibles sur {companies.length} total
+                      {companies.filter((c) => c.linkedinUrl).length}{" "}
+                      entreprises éligibles sur {companies.length} total
                     </Badge>
                     {companies.filter((c) => c.linkedinUrl).length === 0 && (
                       <span className="flex items-center gap-1 text-muted-foreground">
@@ -651,50 +833,70 @@ export default function EnrichmentPage() {
                   </div>
                 </div>
 
-                {selectedCompanyId && (() => {
-                  const selectedCompany = companies.find((c) => c.id === selectedCompanyId);
-                  const companyScrapers = getScrapersForContext("company");
-                  
-                  return (
-                    <div className="grid gap-4 md:grid-cols-1">
-                      {companyScrapers.map((scraper) => {
-                        const isCompanyPostsScraper = scraper.mapperType === "linkedin-company-posts";
-                        const hasLinkedinUrl = selectedCompany?.linkedinUrl != null;
-                        const canEnrich = !isCompanyPostsScraper || hasLinkedinUrl;
-                        const warningMessage = isCompanyPostsScraper && !hasLinkedinUrl
-                          ? "Cette entreprise n'a pas d'URL LinkedIn et ne peut pas être enrichie avec des posts d'entreprise"
-                          : undefined;
+                {selectedCompanyId &&
+                  (() => {
+                    const selectedCompany = companies.find(
+                      (c) => c.id === selectedCompanyId,
+                    );
+                    const companyScrapers = getScrapersForContext("company");
 
-                        return (
-                          <EnrichmentForm
-                            key={scraper.id}
-                            scraperId={scraper.id}
-                            scraperName={scraper.name}
-                            onSubmit={handleEnrichCompany}
-                            isSubmitting={isSubmitting}
-                            disabled={!canEnrich}
-                            warningMessage={warningMessage}
-                          />
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
+                    return (
+                      <div className="grid gap-4 md:grid-cols-1">
+                        {companyScrapers.map((scraper) => {
+                          const isCompanyPostsScraper =
+                            scraper.mapperType === "linkedin-company-posts";
+                          const hasLinkedinUrl =
+                            selectedCompany?.linkedinUrl != null;
+                          const canEnrich =
+                            !isCompanyPostsScraper || hasLinkedinUrl;
+                          const warningMessage =
+                            isCompanyPostsScraper && !hasLinkedinUrl
+                              ? "Cette entreprise n'a pas d'URL LinkedIn et ne peut pas être enrichie avec des posts d'entreprise"
+                              : undefined;
+
+                          return (
+                            <EnrichmentForm
+                              key={scraper.id}
+                              scraperId={scraper.id}
+                              scraperName={scraper.name}
+                              onSubmit={handleEnrichCompany}
+                              isSubmitting={isSubmitting}
+                              disabled={!canEnrich}
+                              warningMessage={warningMessage}
+                              paymentType={scraper.paymentType}
+                              costPerThousand={scraper.costPerThousand}
+                              costPerLead={scraper.costPerLead}
+                              actorStartCost={scraper.actorStartCost}
+                              freeQuotaMonthly={scraper.freeQuotaMonthly}
+                              pricingTiers={scraper.pricingTiers}
+                            />
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
               </TabsContent>
 
               <TabsContent value="collection" className="space-y-4 mt-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Sélectionner une collection</label>
+                  <label className="text-sm font-medium">
+                    Sélectionner une collection
+                  </label>
                   <Select
                     value={selectedCollectionId?.toString() || ""}
-                    onValueChange={(value) => setSelectedCollectionId(parseInt(value))}
+                    onValueChange={(value) =>
+                      setSelectedCollectionId(parseInt(value))
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Choisir une collection" />
                     </SelectTrigger>
                     <SelectContent>
                       {collections.map((collection) => (
-                        <SelectItem key={collection.id} value={collection.id.toString()}>
+                        <SelectItem
+                          key={collection.id}
+                          value={collection.id.toString()}
+                        >
                           {collection.name}
                         </SelectItem>
                       ))}
@@ -702,77 +904,225 @@ export default function EnrichmentPage() {
                   </Select>
                 </div>
 
-                {selectedCollectionId && (() => {
-                  const collectionScrapers = getScrapersForContext("collection");
-                  
-                  // Compter les leads avec/sans URL LinkedIn selon le type de scraper
-                  const profilePostsScraper = collectionScrapers.find(s => s.mapperType === "linkedin-profile-posts");
-                  const companyPostsScraper = collectionScrapers.find(s => s.mapperType === "linkedin-company-posts");
-                  
-                  const totalLeads = collectionLeads.length;
-                  const leadsWithoutProfileUrl = profilePostsScraper 
-                    ? collectionLeads.filter(l => !l.linkedinUrl).length 
-                    : 0;
-                  const leadsWithoutCompanyUrl = companyPostsScraper 
-                    ? collectionLeads.filter(l => !l.company?.linkedinUrl).length 
-                    : 0;
-                  
-                  return (
-                    <>
-                      {/* Messages d'avertissement pour les leads sans URL LinkedIn */}
-                      {totalLeads > 0 && (
-                        <>
-                          {profilePostsScraper && leadsWithoutProfileUrl > 0 && (
-                            <div className="mb-4 flex items-start gap-2 rounded-md border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-800 dark:bg-yellow-900/20">
-                              <AlertCircle className="h-4 w-4 shrink-0 text-yellow-600 dark:text-yellow-400 mt-0.5" />
-                              <div className="flex-1">
-                                <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                                  {leadsWithoutProfileUrl} lead(s) sans URL LinkedIn
-                                </p>
-                                <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
-                                  Seuls les {totalLeads - leadsWithoutProfileUrl} lead(s) avec une URL LinkedIn seront enrichis avec des posts de profil.
-                                </p>
-                              </div>
-                            </div>
-                          )}
-                          {companyPostsScraper && leadsWithoutCompanyUrl > 0 && (
-                            <div className="mb-4 flex items-start gap-2 rounded-md border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-800 dark:bg-yellow-900/20">
-                              <AlertCircle className="h-4 w-4 shrink-0 text-yellow-600 dark:text-yellow-400 mt-0.5" />
-                              <div className="flex-1">
-                                <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                                  {leadsWithoutCompanyUrl} lead(s) sans URL LinkedIn d'entreprise
-                                </p>
-                                <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
-                                  Seuls les {totalLeads - leadsWithoutCompanyUrl} lead(s) avec une entreprise ayant une URL LinkedIn seront enrichis avec des posts d'entreprise.
-                                </p>
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      )}
-                      
-                      {collectionScrapers.length > 1 && (
-                        <div className="mb-4">
-                          <EnrichAllForm
-                            onSubmit={handleEnrichAllCollection}
-                            isSubmitting={isSubmitting}
-                          />
+                {selectedCollectionId &&
+                  (() => {
+                    const collectionScrapers =
+                      getScrapersForContext("collection");
+
+                    // Compter les leads avec/sans URL LinkedIn selon le type de scraper
+                    const profilePostsScraper = collectionScrapers.find(
+                      (s) => s.mapperType === "linkedin-profile-posts",
+                    );
+                    const companyPostsScraper = collectionScrapers.find(
+                      (s) => s.mapperType === "linkedin-company-posts",
+                    );
+
+                    const totalLeads = collectionLeads.length;
+                    const leadsWithoutProfileUrl = profilePostsScraper
+                      ? collectionLeads.filter((l) => !l.linkedinUrl).length
+                      : 0;
+                    const leadsWithoutCompanyUrl = companyPostsScraper
+                      ? collectionLeads.filter((l) => !l.company?.linkedinUrl)
+                          .length
+                      : 0;
+
+                    return (
+                      <>
+                        {/* Messages d'avertissement pour les leads sans URL LinkedIn */}
+                        {totalLeads > 0 && (
+                          <>
+                            {profilePostsScraper &&
+                              leadsWithoutProfileUrl > 0 && (
+                                <div className="mb-4 flex items-start gap-2 rounded-md border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-800 dark:bg-yellow-900/20">
+                                  <AlertCircle className="h-4 w-4 shrink-0 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+                                  <div className="flex-1">
+                                    <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                                      {leadsWithoutProfileUrl} lead(s) sans URL
+                                      LinkedIn
+                                    </p>
+                                    <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
+                                      Seuls les{" "}
+                                      {totalLeads - leadsWithoutProfileUrl}{" "}
+                                      lead(s) avec une URL LinkedIn seront
+                                      enrichis avec des posts de profil.
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+                            {companyPostsScraper &&
+                              leadsWithoutCompanyUrl > 0 && (
+                                <div className="mb-4 flex items-start gap-2 rounded-md border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-800 dark:bg-yellow-900/20">
+                                  <AlertCircle className="h-4 w-4 shrink-0 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+                                  <div className="flex-1">
+                                    <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                                      {leadsWithoutCompanyUrl} lead(s) sans URL
+                                      LinkedIn d&apos;entreprise
+                                    </p>
+                                    <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
+                                      Seuls les{" "}
+                                      {totalLeads - leadsWithoutCompanyUrl}{" "}
+                                      lead(s) avec une entreprise ayant une URL
+                                      LinkedIn seront enrichis avec des posts
+                                      d&pos;entreprise.
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+                          </>
+                        )}
+
+                        {collectionScrapers.length > 1 && (
+                          <div className="mb-4">
+                            <EnrichAllForm
+                              onSubmit={handleEnrichAllCollection}
+                              isSubmitting={isSubmitting}
+                              scrapers={collectionScrapers.map((s) => ({
+                                paymentType: s.paymentType,
+                                costPerThousand: s.costPerThousand,
+                                costPerLead: s.costPerLead,
+                                actorStartCost: s.actorStartCost,
+                                freeQuotaMonthly: s.freeQuotaMonthly,
+                                pricingTiers: s.pricingTiers,
+                              }))}
+                            />
+                          </div>
+                        )}
+                        <div className="grid gap-4 md:grid-cols-2">
+                          {collectionScrapers.map((scraper) => (
+                            <EnrichmentForm
+                              key={scraper.id}
+                              scraperId={scraper.id}
+                              scraperName={scraper.name}
+                              onSubmit={handleEnrichCollection}
+                              isSubmitting={
+                                submittingScrapers.has(scraper.id) ||
+                                isSubmitting
+                              }
+                              paymentType={scraper.paymentType}
+                              costPerThousand={scraper.costPerThousand}
+                              costPerLead={scraper.costPerLead}
+                              actorStartCost={scraper.actorStartCost}
+                              freeQuotaMonthly={scraper.freeQuotaMonthly}
+                              pricingTiers={scraper.pricingTiers}
+                            />
+                          ))}
                         </div>
-                      )}
-                      <div className="grid gap-4 md:grid-cols-2">
-                        {collectionScrapers.map((scraper) => (
-                          <EnrichmentForm
-                            key={scraper.id}
-                            scraperId={scraper.id}
-                            scraperName={scraper.name}
-                            onSubmit={handleEnrichCollection}
-                            isSubmitting={submittingScrapers.has(scraper.id) || isSubmitting}
-                          />
-                        ))}
-                      </div>
-                    </>
-                  );
-                })()}
+                      </>
+                    );
+                  })()}
+              </TabsContent>
+
+              <TabsContent value="verify-emails" className="space-y-4 mt-4">
+                <p className="text-sm text-muted-foreground">
+                  Vérifiez la délivrabilité des emails de vos leads via
+                  EmailListVerify (1 crédit par email).
+                </p>
+                <div className="grid gap-6 md:grid-cols-2">
+                  <div className="rounded-lg border p-4 space-y-4">
+                    <h3 className="font-medium flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      Vérifier l&apos;email d&apos;un lead
+                    </h3>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">
+                        Sélectionner un lead
+                      </label>
+                      <Combobox
+                        options={leads
+                          .filter((l) => l.email)
+                          .map((lead) => ({
+                            value: lead.id.toString(),
+                            label:
+                              lead.fullName ||
+                              (lead.firstName && lead.lastName
+                                ? `${lead.firstName} ${lead.lastName}`
+                                : `Lead #${lead.id}`) +
+                                (lead.company ? ` - ${lead.company.name}` : ""),
+                          }))}
+                        value={selectedLeadId?.toString()}
+                        onValueChange={(v) =>
+                          setSelectedLeadId(v ? parseInt(v) : null)
+                        }
+                        placeholder="Rechercher un lead avec email..."
+                        searchPlaceholder="Tapez pour rechercher..."
+                        emptyMessage="Aucun lead avec email"
+                        filterFunction={(option, search) => {
+                          if (!search) return true;
+                          const searchLower = search.toLowerCase();
+                          const lead = leads.find(
+                            (l) => l.id.toString() === option.value,
+                          );
+                          if (!lead) return false;
+                          const fullName =
+                            lead.fullName ||
+                            (lead.firstName && lead.lastName
+                              ? `${lead.firstName} ${lead.lastName}`
+                              : lead.firstName || lead.lastName || "");
+                          const companyName = lead.company?.name || "";
+                          return (
+                            fullName.toLowerCase().includes(searchLower) ||
+                            (lead.firstName &&
+                              lead.firstName
+                                .toLowerCase()
+                                .includes(searchLower)) ||
+                            (lead.lastName &&
+                              lead.lastName
+                                .toLowerCase()
+                                .includes(searchLower)) ||
+                            companyName.toLowerCase().includes(searchLower)
+                          );
+                        }}
+                      />
+                    </div>
+                    <Button
+                      onClick={handleVerifyLeadEmail}
+                      disabled={!selectedLeadId || verifyingEmails}
+                      className="gap-2"
+                    >
+                      <ShieldCheck className="h-4 w-4" />
+                      {verifyingEmails ? "Vérification..." : "Vérifier l'email"}
+                    </Button>
+                  </div>
+                  <div className="rounded-lg border p-4 space-y-4">
+                    <h3 className="font-medium flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      Vérifier les emails d&apos;une collection
+                    </h3>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">
+                        Sélectionner une collection
+                      </label>
+                      <Select
+                        value={selectedCollectionId?.toString() || ""}
+                        onValueChange={(v) =>
+                          setSelectedCollectionId(v ? parseInt(v) : null)
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choisir une collection" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {collections.map((c) => (
+                            <SelectItem key={c.id} value={c.id.toString()}>
+                              {c.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      onClick={handleVerifyCollectionEmails}
+                      disabled={!selectedCollectionId || verifyingEmails}
+                      variant="outline"
+                      className="gap-2"
+                    >
+                      <ShieldCheck className="h-4 w-4" />
+                      {verifyingEmails
+                        ? "Vérification en cours..."
+                        : "Vérifier la collection"}
+                    </Button>
+                  </div>
+                </div>
               </TabsContent>
             </Tabs>
           )}

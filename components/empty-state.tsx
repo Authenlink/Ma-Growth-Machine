@@ -10,6 +10,7 @@ interface EmptyStateProps {
   description: string;
   actionLabel?: string;
   actionHref?: string;
+  onAction?: () => void;
   icon?: LucideIcon;
   className?: string;
 }
@@ -19,6 +20,7 @@ export function EmptyState({
   description,
   actionLabel,
   actionHref,
+  onAction,
   icon: Icon,
   className,
 }: EmptyStateProps) {
@@ -33,11 +35,15 @@ export function EmptyState({
         <CardTitle>{title}</CardTitle>
         <CardDescription className="mt-2">{description}</CardDescription>
       </CardHeader>
-      {actionLabel && actionHref && (
+      {actionLabel && (actionHref || onAction) && (
         <CardContent className="flex justify-center">
-          <Button asChild>
-            <Link href={actionHref}>{actionLabel}</Link>
-          </Button>
+          {actionHref ? (
+            <Button asChild>
+              <Link href={actionHref}>{actionLabel}</Link>
+            </Button>
+          ) : (
+            <Button onClick={onAction}>{actionLabel}</Button>
+          )}
         </CardContent>
       )}
     </Card>

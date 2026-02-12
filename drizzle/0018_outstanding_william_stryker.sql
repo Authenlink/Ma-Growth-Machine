@@ -1,0 +1,1 @@
+ALTER TABLE "scrapers" ADD COLUMN "uses_ai" boolean DEFAULT false NOT NULL;

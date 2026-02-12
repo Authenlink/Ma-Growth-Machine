@@ -8,35 +8,36 @@ import { toast } from "sonner";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Button } from "@/components/ui/button";
 import {
-    Breadcrumb,
-    BreadcrumbItem,
-    BreadcrumbLink,
-    BreadcrumbList,
-    BreadcrumbPage,
-    BreadcrumbSeparator,
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
 import {
-    SidebarInset,
-    SidebarProvider,
-    SidebarTrigger,
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
 } from "@/components/ui/sidebar";
 import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
 } from "@/components/ui/card";
 import { useScroll } from "@/hooks/use-scroll";
 import { Loader2, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
 import { ScraperForm } from "@/components/scraper-form";
+import { CostEstimation } from "@/components/scraper-fields/cost-estimation";
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { Combobox } from "@/components/ui/combobox";
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +49,14 @@ interface Collection {
   id: number;
   name: string;
   description: string | null;
+  folderId?: number | null;
+}
+
+interface Folder {
+  id: number;
+  name: string;
+  description: string | null;
+  collections: Collection[];
 }
 
 interface Lead {
@@ -68,6 +77,12 @@ interface Company {
   linkedinUrl: string | null;
 }
 
+interface PricingTier {
+  name: string;
+  costPerThousand: number;
+  costPerLead: number;
+}
+
 interface Scraper {
   id: number;
   name: string;
@@ -77,7 +92,15 @@ interface Scraper {
   formConfig: {
     fields: Array<{
       id: string;
-      type: "number" | "switch" | "multiselect" | "select" | "text" | "collection" | "company" | "leads";
+      type:
+        | "number"
+        | "switch"
+        | "multiselect"
+        | "select"
+        | "text"
+        | "collection"
+        | "company"
+        | "leads";
       label: string;
       [key: string]: unknown;
     }>;
@@ -87,6 +110,12 @@ interface Scraper {
       fields: string[];
     }>;
   };
+  paymentType?: string | null;
+  costPerThousand?: number | null;
+  costPerLead?: number | null;
+  actorStartCost?: number | null;
+  freeQuotaMonthly?: number | null;
+  pricingTiers?: PricingTier[] | null;
 }
 
 interface ScrapingMetrics {
@@ -94,6 +123,20 @@ interface ScrapingMetrics {
   created: number;
   skipped: number;
   errors: number;
+}
+
+interface SeoLocalResultItem {
+  company: string;
+  location: string;
+  industry: string;
+  analysis: {
+    seo_score: "Bon" | "Moyen" | "Faible";
+    avg_position: number;
+    queries_tested: Array<{ keyword: string; position: number | null; found: boolean }>;
+    verdict: string;
+    opportunity: string;
+  };
+  cost: { tokens_used: number; estimated_cost_usd: number };
 }
 
 export default function ScraperFormPage() {
@@ -108,6 +151,7 @@ export default function ScraperFormPage() {
 
   const [scraper, setScraper] = useState<Scraper | null>(null);
   const [collections, setCollections] = useState<Collection[]>([]);
+  const [folders, setFolders] = useState<Folder[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loadingScraper, setLoadingScraper] = useState(true);
@@ -128,6 +172,7 @@ export default function ScraperFormPage() {
   >(null);
 
   // Enrichment form state
+  const [enrichmentFolderId, setEnrichmentFolderId] = useState<number | "">("");
   const [maxPosts, setMaxPosts] = useState(10);
   const [postedDateLimit, setPostedDateLimit] = useState("");
   const [forceEnrichment, setForceEnrichment] = useState(false);
@@ -139,6 +184,7 @@ export default function ScraperFormPage() {
   >("idle");
   const [scrapingMetrics, setScrapingMetrics] =
     useState<ScrapingMetrics | null>(null);
+  const [seoResults, setSeoResults] = useState<SeoLocalResultItem[] | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
@@ -190,17 +236,24 @@ export default function ScraperFormPage() {
   }, [scraperId, status, router]);
 
   useEffect(() => {
-    const fetchCollections = async () => {
+    const fetchFoldersAndCollections = async () => {
       if (status === "authenticated") {
         try {
-          const response = await fetch("/api/collections");
-          if (response.ok) {
-            const data = await response.json();
-            setCollections(data);
+          const [foldersRes, collectionsRes] = await Promise.all([
+            fetch("/api/folders"),
+            fetch("/api/collections"),
+          ]);
+          if (foldersRes.ok) {
+            const foldersData = await foldersRes.json();
+            setFolders(foldersData);
+          }
+          if (collectionsRes.ok) {
+            const collectionsData = await collectionsRes.json();
+            setCollections(collectionsData);
           }
         } catch (error) {
           console.error(
-            "Erreur lors de la récupération des collections:",
+            "Erreur lors de la récupération des dossiers/collections:",
             error,
           );
         } finally {
@@ -209,7 +262,7 @@ export default function ScraperFormPage() {
       }
     };
 
-    fetchCollections();
+    fetchFoldersAndCollections();
   }, [status]);
 
   useEffect(() => {
@@ -244,9 +297,9 @@ export default function ScraperFormPage() {
       // Charger les entreprises si c'est un scraper d'enrichissement company posts
       // ou si le scraper a un champ de type "company"
       const hasCompanyField = scraper?.formConfig?.fields?.some(
-        (field) => field.type === "company"
+        (field) => field.type === "company",
       );
-      
+
       if (
         status === "authenticated" &&
         ((isEnrichmentScraper && isCompanyPostsScraper) || hasCompanyField)
@@ -373,6 +426,108 @@ export default function ScraperFormPage() {
       return;
     }
 
+    // If SEO Local Ranking scraper, use seo-local-ranking API
+    if (scraper?.mapperType === "seo-local-ranking") {
+      const collectionId = formData.collectionId as number | undefined;
+      if (!collectionId || typeof collectionId !== "number") {
+        toast.error("Veuillez sélectionner un dossier et une collection");
+        return;
+      }
+      setIsScraping(true);
+      setScrapingStatus("running");
+      setScrapingMetrics(null);
+      setSeoResults(null);
+      setErrorMessage(null);
+      try {
+        const response = await fetch("/api/seo-local-ranking/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            folderId: formData.folderId,
+            collectionId,
+            selectedLeadIds: (formData.selectedLeads as number[] | undefined)?.length
+              ? (formData.selectedLeads as number[])
+              : undefined,
+            scraperId,
+          }),
+        });
+        const data = await response.json();
+        if (response.ok) {
+          setScrapingStatus("success");
+          setSeoResults(data.results ?? []);
+          setScrapingMetrics({
+            totalFound: data.metrics?.analyzed ?? 0,
+            created: data.metrics?.analyzed ?? 0,
+            skipped: 0,
+            errors: 0,
+          });
+          toast.success(
+            `Analyse terminée : ${data.metrics?.analyzed ?? 0} entreprise(s) analysée(s) ($${(data.metrics?.totalCostUsd ?? 0).toFixed(4)} USD)`,
+          );
+        } else {
+          setScrapingStatus("error");
+          setErrorMessage(data.error || "Erreur lors de l'analyse");
+          toast.error(data.error || "Erreur lors de l'analyse");
+        }
+      } catch (error) {
+        console.error("Erreur:", error);
+        setScrapingStatus("error");
+        setErrorMessage("Erreur de connexion lors de l'analyse");
+        toast.error("Erreur de connexion lors de l'analyse");
+      } finally {
+        setIsScraping(false);
+      }
+      return;
+    }
+
+    // If EmailListVerify scraper, use verify-emails API
+    if (scraper?.mapperType === "email-verify") {
+      const collectionId = formData.collectionId as number | undefined;
+      if (!collectionId || typeof collectionId !== "number") {
+        toast.error("Veuillez sélectionner une collection");
+        return;
+      }
+      setIsScraping(true);
+      setScrapingStatus("running");
+      setScrapingMetrics(null);
+      setErrorMessage(null);
+      try {
+        const response = await fetch(
+          `/api/collections/${collectionId}/verify-emails`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ force: false }),
+          },
+        );
+        const data = await response.json();
+        if (response.ok) {
+          setScrapingStatus("success");
+          setScrapingMetrics({
+            totalFound: data.metrics?.total ?? 0,
+            created: data.metrics?.updated ?? 0,
+            skipped: data.metrics?.unknown ?? 0,
+            errors: data.metrics?.invalid ?? 0,
+          });
+          toast.success(
+            `Vérification terminée : ${data.metrics?.updated ?? 0} emails vérifiés (${data.metrics?.ok ?? 0} délivrables, ${data.metrics?.invalid ?? 0} invalides)`,
+          );
+        } else {
+          setScrapingStatus("error");
+          setErrorMessage(data.error || "Erreur lors de la vérification");
+          toast.error(data.error || "Erreur lors de la vérification");
+        }
+      } catch (error) {
+        console.error("Erreur:", error);
+        setScrapingStatus("error");
+        setErrorMessage("Erreur de connexion");
+        toast.error("Erreur de connexion lors de la vérification");
+      } finally {
+        setIsScraping(false);
+      }
+      return;
+    }
+
     const collectionId = formData.collectionId;
     if (!collectionId || typeof collectionId !== "number") {
       toast.error("Veuillez sélectionner une collection");
@@ -430,7 +585,7 @@ export default function ScraperFormPage() {
 
   // Vérifier si le scraper a un champ de type "company"
   const hasCompanyField = scraper?.formConfig?.fields?.some(
-    (field) => field.type === "company"
+    (field) => field.type === "company",
   );
 
   if (
@@ -593,7 +748,7 @@ export default function ScraperFormPage() {
                     {/* Type d'enrichissement */}
                     <div className="space-y-2">
                       <Label htmlFor="enrichmentType">
-                        Type d'enrichissement *
+                        Type d&apos;enrichissement *
                       </Label>
                       <Select
                         value={enrichmentType || ""}
@@ -605,6 +760,7 @@ export default function ScraperFormPage() {
                           setSelectedLeadId(null);
                           setSelectedCompanyId(null);
                           setSelectedCollectionId(null);
+                          setEnrichmentFolderId("");
                         }}
                       >
                         <SelectTrigger id="enrichmentType">
@@ -665,7 +821,9 @@ export default function ScraperFormPage() {
                           filterFunction={(option, search) => {
                             if (!search) return true;
                             const searchLower = search.toLowerCase();
-                            const lead = leads.find((l) => l.id.toString() === option.value);
+                            const lead = leads.find(
+                              (l) => l.id.toString() === option.value,
+                            );
                             if (!lead) return false;
                             const fullName =
                               lead.fullName ||
@@ -675,26 +833,37 @@ export default function ScraperFormPage() {
                             const companyName = lead.company?.name || "";
                             return (
                               fullName.toLowerCase().includes(searchLower) ||
-                              (lead.firstName && lead.firstName.toLowerCase().includes(searchLower)) ||
-                              (lead.lastName && lead.lastName.toLowerCase().includes(searchLower)) ||
+                              (lead.firstName &&
+                                lead.firstName
+                                  .toLowerCase()
+                                  .includes(searchLower)) ||
+                              (lead.lastName &&
+                                lead.lastName
+                                  .toLowerCase()
+                                  .includes(searchLower)) ||
                               companyName.toLowerCase().includes(searchLower)
                             );
                           }}
                         />
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Badge variant="outline" className="text-xs">
-                            {leads.filter((l) => l.linkedinUrl).length} leads éligibles sur {leads.length} total
+                            {leads.filter((l) => l.linkedinUrl).length} leads
+                            éligibles sur {leads.length} total
                           </Badge>
                         </div>
                         {(() => {
-                          const selectedLead = selectedLeadId ? leads.find((l) => l.id === selectedLeadId) : null;
-                          const hasLinkedinUrl = selectedLead?.linkedinUrl != null;
+                          const selectedLead = selectedLeadId
+                            ? leads.find((l) => l.id === selectedLeadId)
+                            : null;
+                          const hasLinkedinUrl =
+                            selectedLead?.linkedinUrl != null;
                           if (selectedLeadId && !hasLinkedinUrl) {
                             return (
                               <div className="flex items-start gap-2 rounded-md border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-800 dark:bg-yellow-900/20">
                                 <AlertCircle className="h-4 w-4 shrink-0 text-yellow-600 dark:text-yellow-400 mt-0.5" />
                                 <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                                  Ce lead n'a pas d'URL LinkedIn et ne peut pas être enrichi avec des posts de profil
+                                  Ce lead n&apos;a pas d&apos;URL LinkedIn et ne
+                                  peut pas être enrichi avec des posts de profil
                                 </p>
                               </div>
                             );
@@ -726,15 +895,23 @@ export default function ScraperFormPage() {
                           filterFunction={(option, search) => {
                             if (!search) return true;
                             const searchLower = search.toLowerCase();
-                            const company = companies.find((c) => c.id.toString() === option.value);
-                            return company?.name.toLowerCase().includes(searchLower) || false;
+                            const company = companies.find(
+                              (c) => c.id.toString() === option.value,
+                            );
+                            return (
+                              company?.name
+                                .toLowerCase()
+                                .includes(searchLower) || false
+                            );
                           }}
                         />
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Badge variant="outline" className="text-xs">
-                            {companies.filter((c) => c.linkedinUrl).length} entreprises éligibles sur {companies.length} total
+                            {companies.filter((c) => c.linkedinUrl).length}{" "}
+                            entreprises éligibles sur {companies.length} total
                           </Badge>
-                          {companies.filter((c) => c.linkedinUrl).length === 0 && (
+                          {companies.filter((c) => c.linkedinUrl).length ===
+                            0 && (
                             <span className="flex items-center gap-1 text-muted-foreground">
                               <AlertCircle className="h-3 w-3" />
                               Aucune entreprise avec URL LinkedIn disponible
@@ -742,14 +919,19 @@ export default function ScraperFormPage() {
                           )}
                         </div>
                         {(() => {
-                          const selectedCompany = selectedCompanyId ? companies.find((c) => c.id === selectedCompanyId) : null;
-                          const hasLinkedinUrl = selectedCompany?.linkedinUrl != null;
+                          const selectedCompany = selectedCompanyId
+                            ? companies.find((c) => c.id === selectedCompanyId)
+                            : null;
+                          const hasLinkedinUrl =
+                            selectedCompany?.linkedinUrl != null;
                           if (selectedCompanyId && !hasLinkedinUrl) {
                             return (
                               <div className="flex items-start gap-2 rounded-md border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-800 dark:bg-yellow-900/20">
                                 <AlertCircle className="h-4 w-4 shrink-0 text-yellow-600 dark:text-yellow-400 mt-0.5" />
                                 <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                                  Cette entreprise n'a pas d'URL LinkedIn et ne peut pas être enrichie avec des posts d'entreprise
+                                  Cette entreprise n&apos;a pas d&apos;URL
+                                  LinkedIn et ne peut pas être enrichie avec des
+                                  posts d&apos;entreprise
                                 </p>
                               </div>
                             );
@@ -760,30 +942,72 @@ export default function ScraperFormPage() {
                     )}
 
                     {enrichmentType === "collection" && (
-                      <div className="space-y-2">
-                        <Label htmlFor="collectionSelect">
-                          Sélectionner une collection *
-                        </Label>
-                        <Select
-                          value={selectedCollectionId?.toString() || ""}
-                          onValueChange={(value) =>
-                            setSelectedCollectionId(parseInt(value))
-                          }
-                        >
-                          <SelectTrigger id="collectionSelect">
-                            <SelectValue placeholder="Choisir une collection" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {collections.map((collection) => (
-                              <SelectItem
-                                key={collection.id}
-                                value={collection.id.toString()}
-                              >
-                                {collection.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="enrichmentFolderSelect">
+                            Dossier *
+                          </Label>
+                          <Select
+                            value={enrichmentFolderId?.toString() || ""}
+                            onValueChange={(value) => {
+                              setEnrichmentFolderId(
+                                value ? parseInt(value) : "",
+                              );
+                              setSelectedCollectionId(null);
+                            }}
+                          >
+                            <SelectTrigger id="enrichmentFolderSelect">
+                              <SelectValue placeholder="Choisir un dossier" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {folders.map((folder) => (
+                                <SelectItem
+                                  key={folder.id}
+                                  value={folder.id.toString()}
+                                >
+                                  {folder.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="collectionSelect">Collection *</Label>
+                          <Select
+                            value={selectedCollectionId?.toString() || ""}
+                            onValueChange={(value) =>
+                              setSelectedCollectionId(
+                                value ? parseInt(value) : null,
+                              )
+                            }
+                            disabled={!enrichmentFolderId}
+                          >
+                            <SelectTrigger id="collectionSelect">
+                              <SelectValue
+                                placeholder={
+                                  enrichmentFolderId
+                                    ? "Choisir une collection"
+                                    : "Sélectionnez d'abord un dossier"
+                                }
+                              />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(enrichmentFolderId
+                                ? (folders.find(
+                                    (f) => f.id === enrichmentFolderId,
+                                  )?.collections ?? [])
+                                : []
+                              ).map((collection) => (
+                                <SelectItem
+                                  key={collection.id}
+                                  value={collection.id.toString()}
+                                >
+                                  {collection.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
                     )}
 
@@ -836,23 +1060,46 @@ export default function ScraperFormPage() {
                           htmlFor="forceEnrichment"
                           className="cursor-pointer"
                         >
-                          Forcer l'enrichissement
+                          Forcer l&apos;enrichissement
                         </Label>
                       </div>
                       <p className="text-sm text-muted-foreground">
                         Ré-enrichir même si déjà enrichi
                       </p>
                     </div>
+
+                    {/* Cost estimation for enrichment scrapers */}
+                    {(scraper.paymentType === "free_tier" ||
+                      scraper.costPerThousand ||
+                      (scraper.pricingTiers &&
+                        scraper.pricingTiers.length > 0)) && (
+                      <CostEstimation
+                        paymentType={scraper.paymentType ?? null}
+                        costPerThousand={scraper.costPerThousand ?? null}
+                        costPerLead={scraper.costPerLead ?? null}
+                        actorStartCost={scraper.actorStartCost ?? null}
+                        freeQuotaMonthly={scraper.freeQuotaMonthly ?? null}
+                        pricingTiers={scraper.pricingTiers ?? null}
+                        quantity={maxPosts}
+                      />
+                    )}
                   </CardContent>
                 </Card>
               ) : (
                 <ScraperForm
                   formConfig={scraper.formConfig}
                   collections={collections}
+                  folders={folders}
                   companies={companies}
                   onSubmit={handleSubmit}
                   isSubmitting={isScraping}
                   formRef={formRef}
+                  paymentType={scraper.paymentType}
+                  costPerThousand={scraper.costPerThousand}
+                  costPerLead={scraper.costPerLead}
+                  actorStartCost={scraper.actorStartCost}
+                  freeQuotaMonthly={scraper.freeQuotaMonthly}
+                  pricingTiers={scraper.pricingTiers}
                 />
               )}
               <div className="flex gap-2 mt-4">
@@ -863,22 +1110,38 @@ export default function ScraperFormPage() {
                     if (isEnrichmentScraper) {
                       // Validation des prérequis pour l'enrichissement
                       if (enrichmentType === "lead" && selectedLeadId) {
-                        const selectedLead = leads.find((l) => l.id === selectedLeadId);
-                        if (isProfilePostsScraper && !selectedLead?.linkedinUrl) {
+                        const selectedLead = leads.find(
+                          (l) => l.id === selectedLeadId,
+                        );
+                        if (
+                          isProfilePostsScraper &&
+                          !selectedLead?.linkedinUrl
+                        ) {
                           return true; // Désactiver si pas d'URL LinkedIn pour Profile Posts
                         }
                       }
                       if (enrichmentType === "company" && selectedCompanyId) {
-                        const selectedCompany = companies.find((c) => c.id === selectedCompanyId);
-                        if (isCompanyPostsScraper && !selectedCompany?.linkedinUrl) {
+                        const selectedCompany = companies.find(
+                          (c) => c.id === selectedCompanyId,
+                        );
+                        if (
+                          isCompanyPostsScraper &&
+                          !selectedCompany?.linkedinUrl
+                        ) {
                           return true; // Désactiver si pas d'URL LinkedIn pour Company Posts
                         }
                       }
                       // Désactiver si aucun type sélectionné ou si le type nécessite une sélection mais aucune n'est faite
                       if (!enrichmentType) return true;
-                      if (enrichmentType === "lead" && !selectedLeadId) return true;
-                      if (enrichmentType === "company" && !selectedCompanyId) return true;
-                      if (enrichmentType === "collection" && !selectedCollectionId) return true;
+                      if (enrichmentType === "lead" && !selectedLeadId)
+                        return true;
+                      if (enrichmentType === "company" && !selectedCompanyId)
+                        return true;
+                      if (
+                        enrichmentType === "collection" &&
+                        !selectedCollectionId
+                      )
+                        return true;
                     }
                     return false;
                   })()}
@@ -928,7 +1191,7 @@ export default function ScraperFormPage() {
                       : "du scraping"}
                   </CardTitle>
                   <CardDescription>
-                    Suivez l'avancement{" "}
+                    Suivez l&apos;avancement{" "}
                     {isEnrichmentScraper
                       ? "de votre enrichissement"
                       : "de votre scraping"}
@@ -975,37 +1238,56 @@ export default function ScraperFormPage() {
                       <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
                         <CheckCircle2 className="h-5 w-5" />
                         <span className="font-medium">
-                          {isEnrichmentScraper ? "Enrichissement" : "Scraping"}{" "}
+                          {scraper?.mapperType === "email-verify"
+                            ? "Vérification"
+                            : scraper?.mapperType === "seo-local-ranking"
+                              ? "Analyse"
+                              : isEnrichmentScraper
+                                ? "Enrichissement"
+                                : "Scraping"}{" "}
                           terminé avec succès
                         </span>
                       </div>
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">
-                            Total trouvé:
+                            {scraper?.mapperType === "email-verify"
+                              ? "Total vérifiés:"
+                              : scraper?.mapperType === "seo-local-ranking"
+                                ? "Analysées:"
+                                : "Total trouvé:"}
                           </span>
                           <span className="font-medium">
                             {scrapingMetrics.totalFound}
                           </span>
                         </div>
                         <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Créés:</span>
+                          <span className="text-muted-foreground">
+                            {scraper?.mapperType === "email-verify"
+                              ? "Délivrables (ok):"
+                              : "Créés:"}
+                          </span>
                           <span className="font-medium text-green-600 dark:text-green-400">
                             {scrapingMetrics.created}
                           </span>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">
-                            Ignorés (doublons):
+                            {scraper?.mapperType === "email-verify"
+                              ? "Inconnus:"
+                              : "Ignorés (doublons):"}
                           </span>
                           <span className="font-medium text-yellow-600 dark:text-yellow-400">
                             {scrapingMetrics.skipped}
                           </span>
                         </div>
-                        {scrapingMetrics.errors > 0 && (
+                        {(scrapingMetrics.errors > 0 ||
+                          scraper?.mapperType === "email-verify") && (
                           <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">
-                              Erreurs:
+                              {scraper?.mapperType === "email-verify"
+                                ? "Invalides:"
+                                : "Erreurs:"}
                             </span>
                             <span className="font-medium text-red-600 dark:text-red-400">
                               {scrapingMetrics.errors}
@@ -1048,6 +1330,88 @@ export default function ScraperFormPage() {
               </Card>
             </div>
           </div>
+
+          {/* Résultats SEO Local */}
+          {scraper?.mapperType === "seo-local-ranking" &&
+            scrapingStatus === "success" &&
+            seoResults &&
+            seoResults.length > 0 && (
+              <Card className="mt-4">
+                <CardHeader>
+                  <CardTitle>Résultats par entreprise</CardTitle>
+                  <CardDescription>
+                    Score, position moyenne, verdict et opportunité pour chaque
+                    entreprise analysée.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {seoResults.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="rounded-lg border p-4 space-y-3"
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold">{item.company}</span>
+                          <Badge
+                            variant={
+                              item.analysis.seo_score === "Bon"
+                                ? "default"
+                                : item.analysis.seo_score === "Moyen"
+                                  ? "secondary"
+                                  : "outline"
+                            }
+                          >
+                            {item.analysis.seo_score}
+                          </Badge>
+                          <span className="text-sm text-muted-foreground">
+                            {item.location} • {item.industry}
+                          </span>
+                        </div>
+                        <div className="grid gap-2 text-sm md:grid-cols-2">
+                          <div>
+                            <span className="text-muted-foreground">
+                              Position moyenne :
+                            </span>{" "}
+                            {item.analysis.avg_position > 0
+                              ? item.analysis.avg_position.toFixed(1)
+                              : "—"}
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">
+                              Coût :
+                            </span>{" "}
+                            ${item.cost.estimated_cost_usd.toFixed(4)} USD
+                          </div>
+                        </div>
+                        <p className="text-sm">{item.analysis.verdict}</p>
+                        <p className="text-sm text-muted-foreground">
+                          <span className="font-medium">Opportunité :</span>{" "}
+                          {item.analysis.opportunity}
+                        </p>
+                        {item.analysis.queries_tested.length > 0 && (
+                          <details className="text-sm">
+                            <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                              Requêtes testées ({item.analysis.queries_tested.length})
+                            </summary>
+                            <ul className="mt-2 space-y-1 pl-4 list-disc">
+                              {item.analysis.queries_tested.map((q, i) => (
+                                <li key={i}>
+                                  {q.keyword} —{" "}
+                                  {q.found
+                                    ? `Position ${q.position}`
+                                    : "Non trouvé"}
+                                </li>
+                              ))}
+                            </ul>
+                          </details>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
         </div>
       </SidebarInset>
     </SidebarProvider>

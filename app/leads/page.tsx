@@ -33,6 +33,15 @@ interface Collection {
   id: number;
   name: string;
   description: string | null;
+  folderId?: number | null;
+  folderName?: string | null;
+  isDefault?: boolean;
+}
+
+interface Folder {
+  id: number;
+  name: string;
+  description: string | null;
 }
 
 interface Lead {
@@ -75,6 +84,7 @@ export default function LeadsPage() {
   const router = useRouter();
   const hasScrolled = useScroll();
   const [collections, setCollections] = useState<Collection[]>([]);
+  const [folders, setFolders] = useState<Folder[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loadingCollections, setLoadingCollections] = useState(true);
   const [loadingLeads, setLoadingLeads] = useState(true);
@@ -87,6 +97,7 @@ export default function LeadsPage() {
   } | null>(null);
   const [filters, setFilters] = useState<{
     collectionId?: string;
+    folderId?: string;
     companyName?: string;
     leadName?: string;
     seniority?: string;
@@ -102,19 +113,41 @@ export default function LeadsPage() {
     }
   }, [status, router]);
 
-  // Charger les collections
+  // Charger les collections (avec nom du dossier) et en déduire les dossiers
   useEffect(() => {
-    const fetchCollections = async () => {
+    const fetchData = async () => {
       if (status === "authenticated") {
         try {
           const response = await fetch("/api/collections");
           if (response.ok) {
             const data = await response.json();
             setCollections(data);
+
+            // Déduire les dossiers uniques depuis les collections
+            const folderMap = new Map<
+              number,
+              { id: number; name: string; description: string | null }
+            >();
+            data.forEach(
+              (c: {
+                folderId: number | null;
+                folderName: string | null;
+                description: string | null;
+              }) => {
+                if (c.folderId && !folderMap.has(c.folderId)) {
+                  folderMap.set(c.folderId, {
+                    id: c.folderId,
+                    name: c.folderName || "Sans dossier",
+                    description: null,
+                  });
+                }
+              }
+            );
+            setFolders(Array.from(folderMap.values()));
           }
         } catch (error) {
           console.error(
-            "Erreur lors de la récupération des collections:",
+            "Erreur lors de la récupération des données:",
             error
           );
         } finally {
@@ -123,7 +156,7 @@ export default function LeadsPage() {
       }
     };
 
-    fetchCollections();
+    fetchData();
   }, [status]);
 
   // Charger les leads avec filtres et pagination
@@ -225,7 +258,7 @@ export default function LeadsPage() {
           </div>
         </header>
 
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-6 overflow-x-hidden">
+        <div className="flex min-w-0 flex-1 flex-col gap-4 p-4 pt-6 overflow-x-hidden">
           <div className="flex items-center justify-between mb-2">
             <div>
               <h1 className="text-2xl font-bold">Leads</h1>
@@ -264,9 +297,10 @@ export default function LeadsPage() {
               icon={FolderOpen}
             />
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-4 min-w-0">
               <LeadsFilters
                 collections={collections}
+                folders={folders}
                 filters={filters}
                 onFiltersChange={setFilters}
                 resultCount={pagination?.totalItems || 0}

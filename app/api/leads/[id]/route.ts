@@ -48,6 +48,8 @@ export async function GET(
         functional: leads.functional,
         email: leads.email,
         emailCertainty: leads.emailCertainty,
+        emailVerifyEmaillist: leads.emailVerifyEmaillist,
+        emailVerifyEmaillistAt: leads.emailVerifyEmaillistAt,
         personalEmail: leads.personalEmail,
         phoneNumbers: leads.phoneNumbers,
         city: leads.city,

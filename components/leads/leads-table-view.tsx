@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Mail, Linkedin, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { cleanIndustry } from "@/lib/utils";
 
 interface Lead {
   id: number;
@@ -12,6 +13,7 @@ interface Lead {
   lastName: string | null;
   position: string | null;
   email: string | null;
+  emailVerifyEmaillist?: string | null;
   linkedinUrl: string | null;
   seniority: string | null;
   functional: string | null;
@@ -88,14 +90,15 @@ export function LeadsTableView({ leads, onDeleteLead }: LeadsTableViewProps) {
     `${cellClass} sticky left-0 z-[1] min-w-[180px] border-r border-border shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] ${isEvenRow ? "bg-muted" : "bg-background"}`;
 
   return (
-    <div className="rounded-md border max-w-full max-h-[calc(100vh-250px)] overflow-auto">
-      <div className="min-w-fit">
-        <table className="w-full border-collapse min-w-max">
+    <div className="w-full min-w-0 rounded-md border max-h-[calc(100vh-250px)] overflow-auto">
+      <div className="min-w-max">
+        <table className="w-full min-w-max border-collapse">
           <thead>
             <tr className="border-b border-border">
               <th className={stickyHeaderClass}>Nom</th>
               <th className={headerCellClass}>Position</th>
               <th className={headerCellClass}>Entreprise</th>
+              <th className={headerCellClass}>Industrie</th>
               <th className={headerCellClass}>Taille</th>
               <th className={headerCellClass}>Email</th>
               <th className={headerCellClass}>Localisation</th>
@@ -137,7 +140,7 @@ export function LeadsTableView({ leads, onDeleteLead }: LeadsTableViewProps) {
                       <Link
                         href={`/companies/${lead.company.id}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="font-medium text-sm hover:underline text-primary block"
+                        className="font-medium text-sm hover:underline text-primary"
                       >
                         {lead.company.name}
                       </Link>
@@ -146,18 +149,47 @@ export function LeadsTableView({ leads, onDeleteLead }: LeadsTableViewProps) {
                     )}
                   </td>
                   <td className={cellClass}>
+                    <span className="text-sm">
+                      {cleanIndustry(lead.company?.industry ?? null) ?? "—"}
+                    </span>
+                  </td>
+                  <td className={cellClass}>
                     <span className="text-sm">{lead.company?.size || "—"}</span>
                   </td>
                   <td className={cellClass}>
                     {lead.email ? (
-                      <a
-                        href={`mailto:${lead.email}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-sm text-primary hover:underline flex items-center gap-1"
-                      >
-                        <Mail className="h-3 w-3 shrink-0" />
-                        {lead.email}
-                      </a>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <a
+                          href={`mailto:${lead.email}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-sm text-primary hover:underline flex items-center gap-1"
+                        >
+                          <Mail className="h-3 w-3 shrink-0" />
+                          {lead.email}
+                        </a>
+                        {lead.emailVerifyEmaillist && (
+                          <Badge
+                            variant={
+                              ["ok", "ok_for_all"].includes(lead.emailVerifyEmaillist)
+                                ? "success"
+                                : ["email_disabled", "dead_server", "invalid_mx", "disposable", "spamtrap"].includes(
+                                    lead.emailVerifyEmaillist
+                                  )
+                                  ? "destructive"
+                                  : "secondary"
+                            }
+                            className="text-[10px] px-1.5 py-0"
+                          >
+                            {lead.emailVerifyEmaillist === "ok"
+                              ? "OK"
+                              : lead.emailVerifyEmaillist === "ok_for_all"
+                                ? "Accepte tout"
+                                : lead.emailVerifyEmaillist === "email_disabled"
+                                  ? "Invalide"
+                                  : lead.emailVerifyEmaillist}
+                          </Badge>
+                        )}
+                      </div>
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}

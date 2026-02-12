@@ -17,6 +17,7 @@ import {
   Search,
   Pencil,
   Star,
+  Code2,
   Loader2,
   Smartphone,
   Monitor,
@@ -57,6 +58,8 @@ import { LeadsCardView } from "@/components/leads/leads-card-view";
 import { toast } from "sonner";
 import { ScrapeEmployeesDialog } from "@/components/companies/scrape-employees-dialog";
 import { EditCompanySheet } from "@/components/companies/edit-company-sheet";
+import { TechnologyBadges } from "@/components/companies/technology-badges";
+import { SocialMediaTab } from "@/components/leads/social-media-tab";
 
 interface Company {
   id: number;
@@ -69,6 +72,7 @@ interface Company {
   size: string | null;
   description: string | null;
   specialities: string[] | null;
+  technologies: string | null;
   city: string | null;
   state: string | null;
   country: string | null;
@@ -167,6 +171,18 @@ export default function CompanyDetailPage() {
   const [loadingTrustpilot, setLoadingTrustpilot] = useState(false);
   const [loadingMoreTrustpilot, setLoadingMoreTrustpilot] = useState(false);
   const [scrapingTrustpilot, setScrapingTrustpilot] = useState(false);
+  const [companyPosts, setCompanyPosts] = useState<
+    Array<{
+      id: number;
+      postUrl: string;
+      postedDate: Date | null;
+      author: string | null;
+      text: string | null;
+      reactions: number | null;
+      like: number | null;
+    }>
+  >([]);
+  const [loadingCompanyPosts, setLoadingCompanyPosts] = useState(false);
 
   const fetchCompany = async () => {
     if (status === "authenticated" && params.id) {
@@ -296,6 +312,28 @@ export default function CompanyDetailPage() {
     if (status === "authenticated" && params.id) {
       fetchTrustpilotReviews({ limit: 3 });
     }
+  }, [status, params.id]);
+
+  useEffect(() => {
+    const fetchCompanyPosts = async () => {
+      if (status === "authenticated" && params.id) {
+        setLoadingCompanyPosts(true);
+        try {
+          const response = await fetch(
+            `/api/companies/${params.id}/posts?limit=50`,
+          );
+          if (response.ok) {
+            const data = await response.json();
+            setCompanyPosts(data);
+          }
+        } catch (err) {
+          console.error("Erreur lors du chargement des posts LinkedIn:", err);
+        } finally {
+          setLoadingCompanyPosts(false);
+        }
+      }
+    };
+    fetchCompanyPosts();
   }, [status, params.id]);
 
   const handleScrapeTrustpilot = async () => {
@@ -470,11 +508,12 @@ export default function CompanyDetailPage() {
             </div>
 
             {/* En-tête */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="text-3xl mb-2">
+            <Card className="overflow-hidden border-border/80">
+              <div className="h-1 bg-gradient-to-r from-primary/60 via-primary/40 to-primary/20" />
+              <CardHeader className="pb-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className="text-2xl sm:text-3xl font-bold tracking-tight mb-2">
                       {company.name}
                     </CardTitle>
                     <CardDescription className="text-base flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -554,6 +593,9 @@ export default function CompanyDetailPage() {
               <TabsList>
                 <TabsTrigger value="info">Informations</TabsTrigger>
                 <TabsTrigger value="leads">Leads ({leads.length})</TabsTrigger>
+                <TabsTrigger value="social">
+                  Réseaux sociaux ({companyPosts.length})
+                </TabsTrigger>
                 <TabsTrigger value="trustpilot">
                   Avis Trustpilot ({trustpilotStats.count})
                 </TabsTrigger>
@@ -611,6 +653,28 @@ export default function CompanyDetailPage() {
                       )}
                     </CardContent>
                   </Card>
+
+                  {/* Technologies */}
+                  {company.technologies && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Code2 className="h-5 w-5" />
+                          Technologies
+                        </CardTitle>
+                        <CardDescription>
+                          Stack technique détectée pour cette entreprise
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <TechnologyBadges
+                          technologies={company.technologies}
+                          maxVisible={12}
+                          size="md"
+                        />
+                      </CardContent>
+                    </Card>
+                  )}
 
                   {/* Description et spécialités */}
                   {(company.description || company.specialities) && (
@@ -986,6 +1050,21 @@ export default function CompanyDetailPage() {
                   </Card>
                 ) : (
                   <LeadsCardView leads={leads} />
+                )}
+              </TabsContent>
+
+              <TabsContent value="social" className="mt-4">
+                {loadingCompanyPosts ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  <SocialMediaTab
+                    companyPosts={companyPosts}
+                    leadPosts={[]}
+                    companyName={company?.name}
+                    emptyContext="pour cette entreprise"
+                  />
                 )}
               </TabsContent>
 

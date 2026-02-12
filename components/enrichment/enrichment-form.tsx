@@ -1,12 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Loader2, AlertCircle } from "lucide-react";
+import { CostEstimation } from "@/components/scraper-fields/cost-estimation";
+
+interface PricingTier {
+  name: string;
+  costPerThousand: number;
+  costPerLead: number;
+}
 
 interface EnrichmentFormProps {
   scraperId: number;
@@ -23,6 +36,13 @@ interface EnrichmentFormProps {
   isSubmitting?: boolean;
   disabled?: boolean;
   warningMessage?: string;
+  // Pricing props
+  paymentType?: string | null;
+  costPerThousand?: number | null;
+  costPerLead?: number | null;
+  actorStartCost?: number | null;
+  freeQuotaMonthly?: number | null;
+  pricingTiers?: PricingTier[] | null;
 }
 
 export function EnrichmentForm({
@@ -35,10 +55,20 @@ export function EnrichmentForm({
   isSubmitting = false,
   disabled = false,
   warningMessage,
+  paymentType,
+  costPerThousand,
+  costPerLead,
+  actorStartCost,
+  freeQuotaMonthly,
+  pricingTiers,
 }: EnrichmentFormProps) {
   const [maxPosts, setMaxPosts] = useState(initialMaxPosts);
-  const [postedDateLimit, setPostedDateLimit] = useState(initialPostedDateLimit || "");
-  const [forceEnrichment, setForceEnrichment] = useState(initialForceEnrichment);
+  const [postedDateLimit, setPostedDateLimit] = useState(
+    initialPostedDateLimit || "",
+  );
+  const [forceEnrichment, setForceEnrichment] = useState(
+    initialForceEnrichment,
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,7 +85,7 @@ export function EnrichmentForm({
       <CardHeader>
         <CardTitle>{scraperName}</CardTitle>
         <CardDescription>
-          Configurez les paramètres d'enrichissement pour ce scraper
+          Configurez les paramètres d&apos;enrichissement pour ce scraper
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -69,9 +99,7 @@ export function EnrichmentForm({
         )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="maxPosts">
-              Nombre maximum de posts
-            </Label>
+            <Label htmlFor="maxPosts">Nombre maximum de posts</Label>
             <Input
               id="maxPosts"
               type="number"
@@ -88,9 +116,7 @@ export function EnrichmentForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="postedDateLimit">
-              Date limite (optionnel)
-            </Label>
+            <Label htmlFor="postedDateLimit">Date limite (optionnel)</Label>
             <Input
               id="postedDateLimit"
               type="date"
@@ -111,14 +137,32 @@ export function EnrichmentForm({
               disabled={disabled}
             />
             <Label htmlFor="forceEnrichment" className="cursor-pointer">
-              Forcer l'enrichissement
+              Forcer l&apos;enrichissement
             </Label>
           </div>
           <p className="text-sm text-muted-foreground">
             Ré-enrichir même si déjà enrichi
           </p>
 
-          <Button type="submit" disabled={isSubmitting || disabled} className="w-full">
+          {(paymentType === "free_tier" ||
+            costPerThousand ||
+            (pricingTiers && pricingTiers.length > 0)) && (
+            <CostEstimation
+              paymentType={paymentType ?? null}
+              costPerThousand={costPerThousand ?? null}
+              costPerLead={costPerLead ?? null}
+              actorStartCost={actorStartCost ?? null}
+              freeQuotaMonthly={freeQuotaMonthly ?? null}
+              pricingTiers={pricingTiers ?? null}
+              quantity={maxPosts}
+            />
+          )}
+
+          <Button
+            type="submit"
+            disabled={isSubmitting || disabled}
+            className="w-full"
+          >
             {isSubmitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

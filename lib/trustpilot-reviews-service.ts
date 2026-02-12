@@ -9,12 +9,19 @@ const POLL_INTERVAL = 5000;
  * @param startUrls URLs Trustpilot (ex: https://www.trustpilot.com/review/bricks.co)
  * @param maxItems Nombre max d'avis à récupérer (défaut 100)
  */
+export interface TrustpilotScraperResult {
+  items: unknown[];
+  runId: string;
+  usageTotalUsd?: number;
+  status: string;
+}
+
 export async function runTrustpilotScraper(
   startUrls: string[],
   maxItems: number = 100
-): Promise<unknown[]> {
+): Promise<TrustpilotScraperResult> {
   if (startUrls.length === 0) {
-    return [];
+    return { items: [], runId: "", usageTotalUsd: undefined, status: "SUCCEEDED" };
   }
 
   const input = {
@@ -59,5 +66,10 @@ export async function runTrustpilotScraper(
     .dataset(runStatus.defaultDatasetId)
     .listItems();
 
-  return items;
+  return {
+    items,
+    runId: run.id,
+    usageTotalUsd: runStatus.usageTotalUsd ?? undefined,
+    status: runStatus.status,
+  };
 }

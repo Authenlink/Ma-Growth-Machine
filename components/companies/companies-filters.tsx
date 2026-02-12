@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { ChevronDown, ChevronUp, X, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import {
   Collapsible,
@@ -60,12 +59,13 @@ export function CompaniesFilters({
   return (
     <div className="space-y-4">
       {/* Filtres principaux */}
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="flex-1 min-w-[200px]">
-          <Label htmlFor="filter-company-name" className="text-xs mb-1.5 block">
-            Nom de l&apos;entreprise
-          </Label>
-          <Input
+      <div className="rounded-xl border border-border/80 bg-card/30 p-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex-1 min-w-[200px]">
+            <Label htmlFor="filter-company-name" className="text-xs font-medium mb-1.5 block">
+              Nom de l&apos;entreprise
+            </Label>
+            <Input
             id="filter-company-name"
             placeholder="Rechercher une entreprise..."
             value={localFilters.name || ""}
@@ -100,6 +100,7 @@ export function CompaniesFilters({
             Réinitialiser
           </Button>
         )}
+        </div>
       </div>
 
       {/* Compteur de résultats */}
@@ -124,7 +125,7 @@ export function CompaniesFilters({
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent className="mt-4">
-          <div className="rounded-lg border bg-card p-4">
+          <div className="rounded-lg border border-border/80 bg-muted/20 p-4">
             <FieldGroup className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <Field>
                 <FieldLabel htmlFor="filter-size">Taille</FieldLabel>

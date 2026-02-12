@@ -1,17 +1,9 @@
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { resolve } from "path";
 import * as dotenv from "dotenv";
 import { scrapers } from "../lib/schema";
-import {
-  JOB_TITLES,
-  SENIORITY_LEVELS,
-  DEPARTMENTS,
-  COUNTRIES,
-  COMPANY_SIZES,
-  INDUSTRIES,
-} from "../lib/scrapers/constants";
 
 // Charger les variables d'environnement depuis .env
 const envPath = resolve(process.cwd(), ".env");
@@ -38,11 +30,12 @@ async function seedScrapers() {
   const apifyFormConfig = {
     fields: [
       {
-        id: "collectionId",
-        type: "collection" as const,
-        label: "Collection",
+        id: "folder_collection",
+        type: "folder_collection" as const,
+        label: "Dossier et collection",
         required: true,
-        helpText: "Sélectionnez la collection où sauvegarder les leads.",
+        helpText:
+          "Sélectionnez d'abord un dossier, puis une collection où sauvegarder les leads.",
       },
       {
         id: "totalResults",
@@ -207,9 +200,10 @@ async function seedScrapers() {
     ],
     sections: [
       {
-        title: "Collection",
-        description: "Sélectionnez la collection où sauvegarder les leads.",
-        fields: ["collectionId"],
+        title: "Dossier et collection",
+        description:
+          "Sélectionnez d'abord un dossier, puis une collection où sauvegarder les leads.",
+        fields: ["folder_collection"],
       },
       {
         title: "Résultats",
@@ -243,14 +237,12 @@ async function seedScrapers() {
       {
         title: "Localisation Personne",
         description: "Filtrez par pays et ville de la personne.",
-        fields: [
-          "personLocationCountryIncludes",
-          "personLocationCityIncludes",
-        ],
+        fields: ["personLocationCountryIncludes", "personLocationCityIncludes"],
       },
       {
         title: "Entreprise",
-        description: "Filtrez par entreprise, taille, industrie et localisation.",
+        description:
+          "Filtrez par entreprise, taille, industrie et localisation.",
         fields: [
           "companyNameMatchMode",
           "companyDomainMatchMode",
@@ -282,7 +274,8 @@ async function seedScrapers() {
         type: "text" as const,
         label: "Date limite (optionnel)",
         placeholder: "YYYY-MM-DD ou timestamp",
-        helpText: "Ne récupérer que les posts après cette date (format ISO ou timestamp)",
+        helpText:
+          "Ne récupérer que les posts après cette date (format ISO ou timestamp)",
       },
       {
         id: "forceEnrichment",
@@ -324,7 +317,8 @@ async function seedScrapers() {
         type: "text" as const,
         label: "Date limite (optionnel)",
         placeholder: "YYYY-MM-DD ou timestamp",
-        helpText: "Ne récupérer que les posts après cette date (format ISO ou timestamp)",
+        helpText:
+          "Ne récupérer que les posts après cette date (format ISO ou timestamp)",
       },
       {
         id: "forceEnrichment",
@@ -352,18 +346,20 @@ async function seedScrapers() {
   const linkedinCompanyEmployeesFormConfig = {
     fields: [
       {
-        id: "collectionId",
-        type: "collection" as const,
-        label: "Collection",
+        id: "folder_collection",
+        type: "folder_collection" as const,
+        label: "Dossier et collection",
         required: true,
-        helpText: "Sélectionnez la collection où sauvegarder les employés.",
+        helpText:
+          "Sélectionnez d'abord un dossier, puis une collection où sauvegarder les employés.",
       },
       {
         id: "companyId",
         type: "company" as const,
         label: "Entreprise (depuis la liste)",
         required: false,
-        helpText: "Sélectionnez une entreprise depuis votre liste, ou saisissez directement l'URL LinkedIn ci-dessous.",
+        helpText:
+          "Sélectionnez une entreprise depuis votre liste, ou saisissez directement l'URL LinkedIn ci-dessous.",
       },
       {
         id: "companyLinkedinUrl",
@@ -371,7 +367,8 @@ async function seedScrapers() {
         label: "URL LinkedIn de l'entreprise",
         required: false,
         placeholder: "https://www.linkedin.com/company/nom-entreprise",
-        helpText: "Saisissez directement l'URL LinkedIn de l'entreprise (ex: https://www.linkedin.com/company/bricks-fr). Ce champ est prioritaire sur la sélection ci-dessus.",
+        helpText:
+          "Saisissez directement l'URL LinkedIn de l'entreprise (ex: https://www.linkedin.com/company/bricks-fr). Ce champ est prioritaire sur la sélection ci-dessus.",
       },
       {
         id: "maxItems",
@@ -388,11 +385,16 @@ async function seedScrapers() {
         type: "select" as const,
         label: "Mode de scraping des profils",
         defaultValue: "Full ($8 per 1k)",
-        options: ["Short ($4 per 1k)", "Full ($8 per 1k)", "Full + email search ($12 per 1k)"],
+        options: [
+          "Short ($4 per 1k)",
+          "Full ($8 per 1k)",
+          "Full + email search ($12 per 1k)",
+        ],
         optionLabels: {
           "Short ($4 per 1k)": "Court ($4 pour 1k)",
           "Full ($8 per 1k)": "Complet ($8 pour 1k)",
-          "Full + email search ($12 per 1k)": "Complet + recherche email ($12 pour 1k)",
+          "Full + email search ($12 per 1k)":
+            "Complet + recherche email ($12 pour 1k)",
         },
         helpText: "Choisissez le niveau de détail des profils à scraper",
       },
@@ -401,7 +403,8 @@ async function seedScrapers() {
         type: "switch" as const,
         label: "Employés ayant changé de poste récemment",
         defaultValue: false,
-        helpText: "Ne récupérer que les employés ayant changé de poste récemment",
+        helpText:
+          "Ne récupérer que les employés ayant changé de poste récemment",
       },
       {
         id: "companyBatchMode",
@@ -413,38 +416,285 @@ async function seedScrapers() {
           all_at_once: "Toutes en une fois",
           one_by_one: "Une par une",
         },
-        helpText: "Comment traiter les entreprises (toutes en une fois ou une par une)",
+        helpText:
+          "Comment traiter les entreprises (toutes en une fois ou une par une)",
       },
     ],
     sections: [
       {
-        title: "Collection",
-        description: "Sélectionnez la collection où sauvegarder les employés.",
-        fields: ["collectionId"],
+        title: "Dossier et collection",
+        description:
+          "Sélectionnez d'abord un dossier, puis une collection où sauvegarder les employés.",
+        fields: ["folder_collection"],
       },
       {
         title: "Entreprise",
-        description: "Sélectionnez une entreprise depuis votre liste ou saisissez directement son URL LinkedIn.",
+        description:
+          "Sélectionnez une entreprise depuis votre liste ou saisissez directement son URL LinkedIn.",
         fields: ["companyId", "companyLinkedinUrl"],
       },
       {
         title: "Paramètres",
         description: "Configurez les paramètres de scraping.",
-        fields: ["maxItems", "profileScraperMode", "recentlyChangedJobs", "companyBatchMode"],
+        fields: [
+          "maxItems",
+          "profileScraperMode",
+          "recentlyChangedJobs",
+          "companyBatchMode",
+        ],
+      },
+    ],
+  };
+
+  // Configuration du formulaire Leads Finder (code_crafter/leads-finder)
+  const REVENUE_OPTIONS = [
+    "100K",
+    "500K",
+    "1M",
+    "5M",
+    "10M",
+    "25M",
+    "50M",
+    "100M",
+    "500M",
+    "1B",
+    "5B",
+    "10B",
+  ];
+  const leadsFinderFormConfig = {
+    fields: [
+      {
+        id: "folder_collection",
+        type: "folder_collection" as const,
+        label: "Dossier et collection",
+        required: true,
+        helpText:
+          "Sélectionnez d'abord un dossier, puis une collection où sauvegarder les leads.",
+      },
+      {
+        id: "totalResults",
+        type: "number" as const,
+        label: "Nombre de leads à récupérer",
+        required: true,
+        min: 1,
+        max: 50000,
+        defaultValue: 100,
+        helpText:
+          "Nombre maximum de leads (1-50000). Plan gratuit Apify: 100 max.",
+      },
+      {
+        id: "emailStatus",
+        type: "select" as const,
+        label: "Statut de l'email",
+        defaultValue: "",
+        options: ["", "validated", "unverified"],
+        optionLabels: {
+          "": "Tous",
+          validated: "Vérifiés uniquement",
+          unverified: "Non vérifiés",
+        },
+        helpText: "Filtrer par statut de vérification de l'email",
+      },
+      {
+        id: "personTitleIncludes",
+        type: "multiselect" as const,
+        label: "Titres à inclure",
+        optionsSource: "JOB_TITLES",
+        helpText: "Ex: realtor, software developer, teacher",
+      },
+      {
+        id: "personTitleExcludes",
+        type: "multiselect" as const,
+        label: "Titres à exclure",
+        optionsSource: "JOB_TITLES",
+        helpText: "Exclure certains titres de poste",
+      },
+      {
+        id: "seniorityIncludes",
+        type: "multiselect" as const,
+        label: "Niveau de seniorité",
+        optionsSource: "SENIORITY_LEVELS",
+        helpText: "Filtrez par niveau hiérarchique",
+      },
+      {
+        id: "personFunctionIncludes",
+        type: "multiselect" as const,
+        label: "Départements à inclure",
+        optionsSource: "DEPARTMENTS",
+        helpText: "Filtrez par département ou fonction",
+      },
+      {
+        id: "personLocationCountryIncludes",
+        type: "multiselect" as const,
+        label: "Pays / Région à inclure",
+        optionsSource: "COUNTRIES",
+        helpText: "Localisation des contacts",
+      },
+      {
+        id: "personLocationCityIncludes",
+        type: "text" as const,
+        label: "Villes à inclure",
+        placeholder: "Paris, Marseille, Lyon...",
+        helpText: "Villes séparées par des virgules",
+      },
+      {
+        id: "personLocationCountryExcludes",
+        type: "multiselect" as const,
+        label: "Pays / Région à exclure",
+        optionsSource: "COUNTRIES",
+        helpText: "Exclure certains pays",
+      },
+      {
+        id: "personLocationCityExcludes",
+        type: "text" as const,
+        label: "Villes à exclure",
+        placeholder: "Paris, Lyon...",
+        helpText: "Villes à exclure, séparées par des virgules",
+      },
+      {
+        id: "companyDomainIncludes",
+        type: "text" as const,
+        label: "Domaines d'entreprise",
+        placeholder: "google.com, apple.com, tesla.com",
+        helpText: "Domaines ou URLs à inclure (séparés par des virgules)",
+      },
+      {
+        id: "companyEmployeeSizeIncludes",
+        type: "multiselect" as const,
+        label: "Taille de l'entreprise",
+        optionsSource: "COMPANY_SIZES",
+        helpText: "Filtrez par nombre d'employés",
+      },
+      {
+        id: "companyIndustryIncludes",
+        type: "multiselect" as const,
+        label: "Industries à inclure",
+        optionsSource: "INDUSTRIES",
+        helpText: "Filtrez par industrie",
+      },
+      {
+        id: "companyIndustryExcludes",
+        type: "multiselect" as const,
+        label: "Industries à exclure",
+        optionsSource: "INDUSTRIES",
+        helpText: "Exclure certaines industries",
+      },
+      {
+        id: "companyKeywordsIncludes",
+        type: "text" as const,
+        label: "Mots-clés entreprise à inclure",
+        placeholder: "restaurant, fitness, gym, software",
+        helpText: "Mots-clés séparés par des virgules",
+      },
+      {
+        id: "companyKeywordsExcludes",
+        type: "text" as const,
+        label: "Mots-clés entreprise à exclure",
+        placeholder: "restaurant, fitness...",
+        helpText: "Mots-clés à exclure",
+      },
+      {
+        id: "minRevenue",
+        type: "select" as const,
+        label: "Revenu minimum",
+        defaultValue: "",
+        options: ["", ...REVENUE_OPTIONS],
+        helpText: "Revenu minimum de l'entreprise",
+      },
+      {
+        id: "maxRevenue",
+        type: "select" as const,
+        label: "Revenu maximum",
+        defaultValue: "",
+        options: ["", ...REVENUE_OPTIONS],
+        helpText: "Revenu maximum de l'entreprise",
+      },
+      {
+        id: "funding",
+        type: "multiselect" as const,
+        label: "Funding",
+        options: [
+          "seed",
+          "series-a",
+          "series-b",
+          "series-c",
+          "series-d",
+          "growth",
+          "ipo",
+        ],
+        optionLabels: {
+          seed: "Seed",
+          "series-a": "Series A",
+          "series-b": "Series B",
+          "series-c": "Series C",
+          "series-d": "Series D",
+          growth: "Growth",
+          ipo: "IPO",
+        },
+        helpText: "Filtrer par tour de financement",
+      },
+    ],
+    sections: [
+      {
+        title: "Dossier et collection",
+        description:
+          "Sélectionnez d'abord un dossier, puis une collection cible.",
+        fields: ["folder_collection"],
+      },
+      {
+        title: "Résultats",
+        description: "Nombre de leads à récupérer.",
+        fields: ["totalResults"],
+      },
+      {
+        title: "Email",
+        description: "Filtrer par statut de l'email.",
+        fields: ["emailStatus"],
+      },
+      {
+        title: "Contact",
+        description: "Titres, seniorité et localisation.",
+        fields: [
+          "personTitleIncludes",
+          "personTitleExcludes",
+          "seniorityIncludes",
+          "personFunctionIncludes",
+          "personLocationCountryIncludes",
+          "personLocationCityIncludes",
+          "personLocationCountryExcludes",
+          "personLocationCityExcludes",
+        ],
+      },
+      {
+        title: "Entreprise",
+        description: "Filtres par entreprise.",
+        fields: [
+          "companyDomainIncludes",
+          "companyEmployeeSizeIncludes",
+          "companyIndustryIncludes",
+          "companyIndustryExcludes",
+          "companyKeywordsIncludes",
+          "companyKeywordsExcludes",
+          "minRevenue",
+          "maxRevenue",
+          "funding",
+        ],
       },
     ],
   };
 
   try {
-    // Vérifier si le scraper existe déjà
+    // Vérifier si le scraper existe déjà (Apify LinkedIn - mapperType apify)
     const existing = await db
       .select()
       .from(scrapers)
-      .where(eq(scrapers.provider, "apify"))
+      .where(
+        and(eq(scrapers.provider, "apify"), eq(scrapers.mapperType, "apify")),
+      )
       .limit(1);
 
     if (existing.length > 0) {
-      console.log("✅ Scraper Apify existe déjà, mise à jour...");
+      console.log("✅ Scraper Apify LinkedIn existe déjà, mise à jour...");
       await db
         .update(scrapers)
         .set({
@@ -457,26 +707,97 @@ async function seedScrapers() {
           },
           formConfig: apifyFormConfig,
           mapperType: "apify",
+          source: "apollo",
+          infoType: "contact_info",
+          toolUrl: "https://console.apify.com/actors/kVYdvNOefemtiDXO5/input",
+          paymentType: "pay_per_event",
+          costPerThousand: 1.0,
+          costPerLead: 0.001,
+          actorStartCost: 0.00001,
+          freeQuotaMonthly: null,
+          pricingTiers: null,
           isActive: true,
           updatedAt: new Date(),
         })
         .where(eq(scrapers.id, existing[0].id));
-      console.log("✅ Scraper Apify mis à jour");
+      console.log("✅ Scraper Apify LinkedIn mis à jour");
     } else {
-      console.log("➕ Insertion du scraper Apify...");
+      console.log("➕ Insertion du scraper Apify LinkedIn...");
       await db.insert(scrapers).values({
         name: "Apify LinkedIn Scraper",
         description:
           "Scraper de leads LinkedIn via Apify. Permet de filtrer par titre, localisation, entreprise et bien plus.",
         provider: "apify",
         providerConfig: {
-          actorId: "kVYdvNOefemtiDXO5",
+          actorId: "pipelinelabs/lead-scraper-apollo-zoominfo-lusha-ppe",
         },
         formConfig: apifyFormConfig,
         mapperType: "apify",
+        source: "apollo",
+        infoType: "contact_info",
+        toolUrl: "https://console.apify.com/actors/kVYdvNOefemtiDXO5/input",
+        paymentType: "pay_per_event",
+        costPerThousand: 1.0,
+        costPerLead: 0.001,
+        actorStartCost: 0.00001,
         isActive: true,
       });
-      console.log("✅ Scraper Apify inséré");
+      console.log("✅ Scraper Apify LinkedIn inséré");
+    }
+
+    // Leads Finder (code_crafter/leads-finder)
+    const existingLeadsFinder = await db
+      .select()
+      .from(scrapers)
+      .where(eq(scrapers.mapperType, "leads-finder"))
+      .limit(1);
+
+    if (existingLeadsFinder.length > 0) {
+      console.log("✅ Scraper Leads Finder existe déjà, mise à jour...");
+      await db
+        .update(scrapers)
+        .set({
+          name: "Leads Finder (Code Crafter)",
+          description:
+            "Alternative Apollo à $1.5/1k leads. Emails vérifiés, téléphones, LinkedIn, infos entreprise.",
+          provider: "apify",
+          providerConfig: { actorId: "code_crafter/leads-finder" },
+          formConfig: leadsFinderFormConfig,
+          mapperType: "leads-finder",
+          source: "leads-finder",
+          infoType: "contact_info",
+          toolUrl: "https://console.apify.com/actors/IoSHqwTR9YGhzccez/input",
+          paymentType: "pay_per_event",
+          costPerThousand: 2.0,
+          costPerLead: 0.002,
+          actorStartCost: 0.02,
+          freeQuotaMonthly: null,
+          pricingTiers: null,
+          isActive: true,
+          updatedAt: new Date(),
+        })
+        .where(eq(scrapers.id, existingLeadsFinder[0].id));
+      console.log("✅ Scraper Leads Finder mis à jour");
+    } else {
+      console.log("➕ Insertion du scraper Leads Finder...");
+      await db.insert(scrapers).values({
+        name: "Leads Finder (Code Crafter)",
+        description:
+          "Alternative Apollo à $1.5/1k leads. Emails vérifiés, téléphones, LinkedIn, infos entreprise.",
+        provider: "apify",
+        providerConfig: { actorId: "code_crafter/leads-finder" },
+        formConfig: leadsFinderFormConfig,
+        mapperType: "leads-finder",
+        source: "leads-finder",
+        infoType: "contact_info",
+        toolUrl: "https://console.apify.com/actors/IoSHqwTR9YGhzccez/input",
+        paymentType: "pay_per_event",
+        costPerThousand: 2.0,
+        costPerLead: 0.002,
+        actorStartCost: 0.02,
+        isActive: true,
+      });
+      console.log("✅ Scraper Leads Finder inséré");
     }
 
     // LinkedIn Company Posts Scraper
@@ -487,7 +808,9 @@ async function seedScrapers() {
       .limit(1);
 
     if (existingCompanyPosts.length > 0) {
-      console.log("✅ Scraper LinkedIn Company Posts existe déjà, mise à jour...");
+      console.log(
+        "✅ Scraper LinkedIn Company Posts existe déjà, mise à jour...",
+      );
       await db
         .update(scrapers)
         .set({
@@ -500,6 +823,15 @@ async function seedScrapers() {
           },
           formConfig: linkedinCompanyPostsFormConfig,
           mapperType: "linkedin-company-posts",
+          source: "linkedin",
+          infoType: "social_media_posts",
+          toolUrl: "https://console.apify.com/actors/WI0tj4Ieb5Kq458gB/input",
+          paymentType: "pay_per_posts",
+          costPerThousand: 2.0,
+          costPerLead: 0.002,
+          actorStartCost: null,
+          freeQuotaMonthly: null,
+          pricingTiers: null,
           isActive: true,
           updatedAt: new Date(),
         })
@@ -517,6 +849,12 @@ async function seedScrapers() {
         },
         formConfig: linkedinCompanyPostsFormConfig,
         mapperType: "linkedin-company-posts",
+        source: "linkedin",
+        infoType: "social_media_posts",
+        toolUrl: "https://console.apify.com/actors/WI0tj4Ieb5Kq458gB/input",
+        paymentType: "pay_per_posts",
+        costPerThousand: 2.0,
+        costPerLead: 0.002,
         isActive: true,
       });
       console.log("✅ Scraper LinkedIn Company Posts inséré");
@@ -530,19 +868,29 @@ async function seedScrapers() {
       .limit(1);
 
     if (existingProfilePosts.length > 0) {
-      console.log("✅ Scraper LinkedIn Profile Posts existe déjà, mise à jour...");
+      console.log(
+        "✅ Scraper LinkedIn Profile Posts existe déjà, mise à jour...",
+      );
       await db
         .update(scrapers)
         .set({
           name: "LinkedIn Profile Posts Enrichment",
-          description:
-            "Enrichit les leads avec leurs propres posts LinkedIn.",
+          description: "Enrichit les leads avec leurs propres posts LinkedIn.",
           provider: "apify",
           providerConfig: {
             actorId: "harvestapi/linkedin-profile-posts",
           },
           formConfig: linkedinProfilePostsFormConfig,
           mapperType: "linkedin-profile-posts",
+          source: "linkedin",
+          infoType: "social_media_posts",
+          toolUrl: "https://console.apify.com/actors/A3cAPGpwBEG8RJwse/input",
+          paymentType: "pay_per_posts",
+          costPerThousand: 2.0,
+          costPerLead: 0.002,
+          actorStartCost: null,
+          freeQuotaMonthly: null,
+          pricingTiers: null,
           isActive: true,
           updatedAt: new Date(),
         })
@@ -552,14 +900,19 @@ async function seedScrapers() {
       console.log("➕ Insertion du scraper LinkedIn Profile Posts...");
       await db.insert(scrapers).values({
         name: "LinkedIn Profile Posts Enrichment",
-        description:
-          "Enrichit les leads avec leurs propres posts LinkedIn.",
+        description: "Enrichit les leads avec leurs propres posts LinkedIn.",
         provider: "apify",
         providerConfig: {
           actorId: "harvestapi/linkedin-profile-posts",
         },
         formConfig: linkedinProfilePostsFormConfig,
         mapperType: "linkedin-profile-posts",
+        source: "linkedin",
+        infoType: "social_media_posts",
+        toolUrl: "https://console.apify.com/actors/A3cAPGpwBEG8RJwse/input",
+        paymentType: "pay_per_posts",
+        costPerThousand: 2.0,
+        costPerLead: 0.002,
         isActive: true,
       });
       console.log("✅ Scraper LinkedIn Profile Posts inséré");
@@ -573,7 +926,9 @@ async function seedScrapers() {
       .limit(1);
 
     if (existingCompanyEmployees.length > 0) {
-      console.log("✅ Scraper LinkedIn Company Employees existe déjà, mise à jour...");
+      console.log(
+        "✅ Scraper LinkedIn Company Employees existe déjà, mise à jour...",
+      );
       await db
         .update(scrapers)
         .set({
@@ -586,6 +941,31 @@ async function seedScrapers() {
           },
           formConfig: linkedinCompanyEmployeesFormConfig,
           mapperType: "linkedin-company-employees",
+          source: "linkedin",
+          infoType: "contact_info",
+          toolUrl: "https://console.apify.com/actors/IoSHqwTR9YGhzccez/input",
+          paymentType: "pay_per_event",
+          costPerThousand: null,
+          costPerLead: null,
+          actorStartCost: 0.02,
+          freeQuotaMonthly: null,
+          pricingTiers: [
+            {
+              name: "Short profile ($4 per 1k)",
+              costPerThousand: 4.0,
+              costPerLead: 0.004,
+            },
+            {
+              name: "Full profile ($8 per 1k)",
+              costPerThousand: 8.0,
+              costPerLead: 0.008,
+            },
+            {
+              name: "Full profile + email search ($12 per 1k)",
+              costPerThousand: 12.0,
+              costPerLead: 0.012,
+            },
+          ],
           isActive: true,
           updatedAt: new Date(),
         })
@@ -603,6 +983,28 @@ async function seedScrapers() {
         },
         formConfig: linkedinCompanyEmployeesFormConfig,
         mapperType: "linkedin-company-employees",
+        source: "linkedin",
+        infoType: "contact_info",
+        toolUrl: "https://console.apify.com/actors/IoSHqwTR9YGhzccez/input",
+        paymentType: "pay_per_event",
+        actorStartCost: 0.02,
+        pricingTiers: [
+          {
+            name: "Short profile ($4 per 1k)",
+            costPerThousand: 4.0,
+            costPerLead: 0.004,
+          },
+          {
+            name: "Full profile ($8 per 1k)",
+            costPerThousand: 8.0,
+            costPerLead: 0.008,
+          },
+          {
+            name: "Full profile + email search ($12 per 1k)",
+            costPerThousand: 12.0,
+            costPerLead: 0.012,
+          },
+        ],
         isActive: true,
       });
       console.log("✅ Scraper LinkedIn Company Employees inséré");
@@ -612,35 +1014,40 @@ async function seedScrapers() {
     const bulkEmailFinderFormConfig = {
       fields: [
         {
-          id: "collectionId",
-          type: "collection" as const,
-          label: "Collection",
+          id: "folder_collection",
+          type: "folder_collection" as const,
+          label: "Dossier et collection",
           required: true,
-          helpText: "Sélectionnez la collection où sauvegarder les leads.",
+          helpText:
+            "Sélectionnez d'abord un dossier, puis une collection où sauvegarder les leads.",
         },
         {
           id: "selectedLeads",
           type: "leads" as const,
           label: "Sélectionner des leads existants",
-          helpText: "Sélectionnez des leads de la collection pour lesquels vous souhaitez trouver des emails. Seuls les leads sans email sont affichés.",
+          helpText:
+            "Sélectionnez des leads de la collection pour lesquels vous souhaitez trouver des emails. Seuls les leads sans email sont affichés.",
         },
         {
           id: "people",
           type: "text" as const,
           label: "Ou entrer manuellement",
           placeholder: "Alban, Huntziger, bricks.co\nYoann, Ross, bricks.co",
-          helpText: "Entrez une personne par ligne au format : Prénom, Nom, Domaine. Vous pouvez coller plusieurs lignes.",
+          helpText:
+            "Entrez une personne par ligne au format : Prénom, Nom, Domaine. Vous pouvez coller plusieurs lignes.",
         },
       ],
       sections: [
         {
-          title: "Collection",
-          description: "Sélectionnez la collection où sauvegarder les leads.",
-          fields: ["collectionId"],
+          title: "Dossier et collection",
+          description:
+            "Sélectionnez d'abord un dossier, puis une collection où sauvegarder les leads.",
+          fields: ["folder_collection"],
         },
         {
           title: "Personnes à rechercher",
-          description: "Sélectionnez des leads existants ou entrez manuellement les personnes pour lesquelles vous souhaitez trouver des emails.",
+          description:
+            "Sélectionnez des leads existants ou entrez manuellement les personnes pour lesquelles vous souhaitez trouver des emails.",
           fields: ["selectedLeads", "people"],
         },
       ],
@@ -666,6 +1073,15 @@ async function seedScrapers() {
           },
           formConfig: bulkEmailFinderFormConfig,
           mapperType: "bulk-email-finder",
+          source: "email",
+          infoType: "contact_info",
+          toolUrl: "https://console.apify.com/actors/ISxvHIfe6r5GZ0veb/input",
+          paymentType: "pay_per_result",
+          costPerThousand: 28.0,
+          costPerLead: 0.028,
+          actorStartCost: null,
+          freeQuotaMonthly: null,
+          pricingTiers: null,
           isActive: true,
           updatedAt: new Date(),
         })
@@ -683,6 +1099,12 @@ async function seedScrapers() {
         },
         formConfig: bulkEmailFinderFormConfig,
         mapperType: "bulk-email-finder",
+        source: "email",
+        infoType: "contact_info",
+        toolUrl: "https://console.apify.com/actors/ISxvHIfe6r5GZ0veb/input",
+        paymentType: "pay_per_result",
+        costPerThousand: 28.0,
+        costPerLead: 0.028,
         isActive: true,
       });
       console.log("✅ Scraper Bulk Email Finder inséré");
@@ -692,10 +1114,11 @@ async function seedScrapers() {
     const trustpilotReviewsFormConfig = {
       fields: [
         {
-          id: "collectionId",
-          type: "collection" as const,
-          label: "Collection",
-          helpText: "En mode collection, sélectionnez la collection à enrichir.",
+          id: "folder_collection",
+          type: "folder_collection" as const,
+          label: "Dossier et collection",
+          helpText:
+            "En mode collection, sélectionnez d'abord un dossier, puis une collection à enrichir.",
         },
         {
           id: "companyId",
@@ -716,8 +1139,9 @@ async function seedScrapers() {
       sections: [
         {
           title: "Paramètres",
-          description: "Scrape les avis Trustpilot via Apify. Un domaine (website) est requis pour chaque entreprise.",
-          fields: ["collectionId", "companyId", "maxItems"],
+          description:
+            "Scrape les avis Trustpilot via Apify. Un domaine (website) est requis pour chaque entreprise.",
+          fields: ["folder_collection", "companyId", "maxItems"],
         },
       ],
     };
@@ -742,6 +1166,15 @@ async function seedScrapers() {
           },
           formConfig: trustpilotReviewsFormConfig,
           mapperType: "trustpilot-reviews",
+          source: "trustpilot",
+          infoType: "reviews",
+          toolUrl: "https://console.apify.com/actors/Omb7MeKVdwRZUOhCK/input",
+          paymentType: "pay_per_reviews",
+          costPerThousand: 0.5,
+          costPerLead: 0.0005,
+          actorStartCost: null,
+          freeQuotaMonthly: null,
+          pricingTiers: null,
           isActive: true,
           updatedAt: new Date(),
         })
@@ -759,9 +1192,289 @@ async function seedScrapers() {
         },
         formConfig: trustpilotReviewsFormConfig,
         mapperType: "trustpilot-reviews",
+        source: "trustpilot",
+        infoType: "reviews",
+        toolUrl: "https://console.apify.com/actors/Omb7MeKVdwRZUOhCK/input",
+        paymentType: "pay_per_reviews",
+        costPerThousand: 0.5,
+        costPerLead: 0.0005,
         isActive: true,
       });
       console.log("✅ Scraper Trustpilot Reviews inséré");
+    }
+
+    // EmailListVerify - Vérification des emails
+    const emailVerifyFormConfig = {
+      fields: [
+        {
+          id: "folder_collection",
+          type: "folder_collection" as const,
+          label: "Collection",
+          required: true,
+          helpText:
+            "Sélectionnez une collection dont vous souhaitez vérifier les emails via EmailListVerify (1 crédit par email).",
+        },
+      ],
+      sections: [
+        {
+          title: "Collection",
+          description:
+            "Sélectionnez une collection pour vérifier la délivrabilité des emails de tous les leads qui ont un email.",
+          fields: ["folder_collection"],
+        },
+      ],
+    };
+
+    const existingEmailVerify = await db
+      .select()
+      .from(scrapers)
+      .where(eq(scrapers.mapperType, "email-verify"))
+      .limit(1);
+
+    if (existingEmailVerify.length > 0) {
+      console.log("✅ Scraper EmailListVerify existe déjà, mise à jour...");
+      await db
+        .update(scrapers)
+        .set({
+          name: "EmailListVerify - Vérifier les emails",
+          description:
+            "Vérifie la délivrabilité des emails de vos leads via EmailListVerify. 1 crédit par email.",
+          provider: "emaillistverify",
+          providerConfig: {},
+          formConfig: emailVerifyFormConfig,
+          mapperType: "email-verify",
+          source: "emaillistverify",
+          infoType: "contact_info",
+          toolUrl: "https://app.emaillistverify.com/",
+          paymentType: "free_tier",
+          costPerThousand: null,
+          costPerLead: null,
+          actorStartCost: null,
+          freeQuotaMonthly: 100,
+          pricingTiers: null,
+          isActive: true,
+          updatedAt: new Date(),
+        })
+        .where(eq(scrapers.id, existingEmailVerify[0].id));
+      console.log("✅ Scraper EmailListVerify mis à jour");
+    } else {
+      console.log("➕ Insertion du scraper EmailListVerify...");
+      await db.insert(scrapers).values({
+        name: "EmailListVerify - Vérifier les emails",
+        description:
+          "Vérifie la délivrabilité des emails de vos leads via EmailListVerify. 1 crédit par email.",
+        provider: "emaillistverify",
+        providerConfig: {},
+        formConfig: emailVerifyFormConfig,
+        mapperType: "email-verify",
+        source: "emaillistverify",
+        infoType: "contact_info",
+        toolUrl: "https://app.emaillistverify.com/",
+        paymentType: "free_tier",
+        freeQuotaMonthly: 100,
+        isActive: true,
+      });
+      console.log("✅ Scraper EmailListVerify inséré");
+    }
+
+    // PageSpeed Insights - Analyse SEO
+    const pageSpeedSeoFormConfig = {
+      fields: [
+        {
+          id: "mode",
+          type: "select" as const,
+          label: "Mode d'analyse",
+          required: true,
+          defaultValue: "single",
+          options: ["single", "collection"],
+          optionLabels: {
+            single: "Un lead ou une entreprise",
+            collection: "Toute une collection",
+          },
+          helpText:
+            "Choisissez d'analyser un élément unique ou toute une collection.",
+        },
+        {
+          id: "companyId",
+          type: "company" as const,
+          label: "Entreprise",
+          required: false,
+          helpText: "Sélectionnez une entreprise à analyser (mode single).",
+        },
+        {
+          id: "folder_collection",
+          type: "folder_collection" as const,
+          label: "Collection",
+          required: false,
+          helpText:
+            "Sélectionnez une collection pour analyser le SEO de tous les leads/entreprises avec un website.",
+        },
+      ],
+      sections: [
+        {
+          title: "Mode d'analyse",
+          description:
+            "Choisissez d'analyser un lead/entreprise ou toute une collection.",
+          fields: ["mode"],
+        },
+        {
+          title: "Cible",
+          description: "Sélectionnez l'entreprise ou la collection à analyser.",
+          fields: ["companyId", "folder_collection"],
+        },
+      ],
+    };
+
+    // Positionnement SEO Local
+    const seoLocalRankingFormConfig = {
+      fields: [
+        {
+          id: "folder_collection",
+          type: "folder_collection" as const,
+          label: "Dossier et collection",
+          required: true,
+          helpText:
+            "Sélectionnez d'abord un dossier, puis une collection cible pour analyser le positionnement SEO local des entreprises.",
+        },
+        {
+          id: "selectedLeads",
+          type: "leads" as const,
+          label: "Sélectionner des leads",
+          helpText:
+            "Optionnel : sélectionnez des leads pour n'analyser que ces entreprises. Si vide, toute la collection est analysée. Seuls les leads avec une entreprise (nom, industrie, ville) sont affichés.",
+          leadsFilterMode: "has_company" as const,
+        },
+      ],
+      sections: [
+        {
+          title: "Dossier et collection",
+          description:
+            "Sélectionnez un dossier puis une collection contenant des leads avec des entreprises.",
+          fields: ["folder_collection"],
+        },
+        {
+          title: "Leads à analyser",
+          description:
+            "Optionnel : choisissez des leads spécifiques ou laissez vide pour analyser toute la collection.",
+          fields: ["selectedLeads"],
+        },
+      ],
+    };
+
+    const existingSeoLocal = await db
+      .select()
+      .from(scrapers)
+      .where(eq(scrapers.mapperType, "seo-local-ranking"))
+      .limit(1);
+
+    if (existingSeoLocal.length > 0) {
+      console.log("✅ Scraper Positionnement SEO Local existe déjà, mise à jour...");
+      await db
+        .update(scrapers)
+        .set({
+          name: "Positionnement SEO Local",
+          description:
+            "Analyse automatiquement le positionnement Google d'une entreprise sur ses mots-clés métiers dans sa zone géographique locale. Utilise OpenAI pour générer les requêtes et vérifier les homonymes, puis Apify pour les recherches Google géolocalisées.",
+          provider: "openai_apify",
+          providerConfig: {
+            openaiModel: "gpt-4o-mini",
+            apifyActor: "apify/google-search-scraper",
+          },
+          formConfig: seoLocalRankingFormConfig,
+          mapperType: "seo-local-ranking",
+          source: "seo_local_ranking",
+          infoType: "seo",
+          toolUrl: "https://apify.com/apify/google-search-scraper",
+          paymentType: "pay_per_result",
+          costPerThousand: null,
+          costPerLead: null,
+          actorStartCost: null,
+          freeQuotaMonthly: null,
+          pricingTiers: null,
+          usesAi: true,
+          isActive: true,
+          updatedAt: new Date(),
+        })
+        .where(eq(scrapers.id, existingSeoLocal[0].id));
+      console.log("✅ Scraper Positionnement SEO Local mis à jour");
+    } else {
+      console.log("➕ Insertion du scraper Positionnement SEO Local...");
+      await db.insert(scrapers).values({
+        name: "Positionnement SEO Local",
+        description:
+          "Analyse automatiquement le positionnement Google d'une entreprise sur ses mots-clés métiers dans sa zone géographique locale. Utilise OpenAI pour générer les requêtes et vérifier les homonymes, puis Apify pour les recherches Google géolocalisées.",
+        provider: "openai_apify",
+        providerConfig: {
+          openaiModel: "gpt-4o-mini",
+          apifyActor: "apify/google-search-scraper",
+        },
+        formConfig: seoLocalRankingFormConfig,
+        mapperType: "seo-local-ranking",
+        source: "seo_local_ranking",
+        infoType: "seo",
+        toolUrl: "https://apify.com/apify/google-search-scraper",
+        paymentType: "pay_per_result",
+        costPerThousand: null,
+        costPerLead: null,
+        actorStartCost: null,
+        freeQuotaMonthly: null,
+        pricingTiers: null,
+        usesAi: true,
+        isActive: true,
+      });
+      console.log("✅ Scraper Positionnement SEO Local inséré");
+    }
+
+    const existingPageSpeed = await db
+      .select()
+      .from(scrapers)
+      .where(eq(scrapers.mapperType, "pagespeed-seo"))
+      .limit(1);
+
+    if (existingPageSpeed.length > 0) {
+      console.log("✅ Scraper PageSpeed Insights existe déjà, mise à jour...");
+      await db
+        .update(scrapers)
+        .set({
+          name: "PageSpeed Insights - Analyse SEO",
+          description:
+            "Analyse le SEO des sites web via Google PageSpeed Insights (performance, accessibilité, bonnes pratiques, SEO). Mobile et desktop.",
+          provider: "google",
+          providerConfig: {},
+          formConfig: pageSpeedSeoFormConfig,
+          mapperType: "pagespeed-seo",
+          source: "google",
+          infoType: "seo",
+          toolUrl: "https://pagespeed.web.dev/",
+          paymentType: "free_tier",
+          costPerThousand: null,
+          costPerLead: null,
+          actorStartCost: null,
+          freeQuotaMonthly: 25000,
+          pricingTiers: null,
+          isActive: true,
+          updatedAt: new Date(),
+        })
+        .where(eq(scrapers.id, existingPageSpeed[0].id));
+      console.log("✅ Scraper PageSpeed Insights mis à jour");
+    } else {
+      console.log("➕ Insertion du scraper PageSpeed Insights...");
+      await db.insert(scrapers).values({
+        name: "PageSpeed Insights - Analyse SEO",
+        description:
+          "Analyse le SEO des sites web via Google PageSpeed Insights (performance, accessibilité, bonnes pratiques, SEO). Mobile et desktop.",
+        provider: "google",
+        providerConfig: {},
+        formConfig: pageSpeedSeoFormConfig,
+        mapperType: "pagespeed-seo",
+        source: "google",
+        infoType: "seo",
+        toolUrl: "https://pagespeed.web.dev/",
+        paymentType: "free_tier",
+        freeQuotaMonthly: 25000,
+        isActive: true,
+      });
+      console.log("✅ Scraper PageSpeed Insights inséré");
     }
 
     console.log("🎉 Seeding terminé!");

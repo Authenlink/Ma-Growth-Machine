@@ -85,6 +85,55 @@
       "when": 1770734978503,
       "tag": "0011_great_rawhide_kid",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1770818492070,
+      "tag": "0012_add_folders",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1770820000000,
+      "tag": "0013_scrapers_source_infotype",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1770820100000,
+      "tag": "0014_add_email_verify_emaillist",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1770820200000,
+      "tag": "0015_add_scraper_pricing",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1770830248007,
+      "tag": "0016_unique_virginia_dare",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1770834829634,
+      "tag": "0017_living_warbird",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1770835336191,
+      "tag": "0018_outstanding_william_stryker",
+      "breakpoints": true
     }
   ]
 }

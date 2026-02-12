@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
 
     // Récupérer les paramètres de filtres
     const collectionId = searchParams.get("collectionId");
+    const folderId = searchParams.get("folderId");
     const companyName = searchParams.get("companyName");
     const leadName = searchParams.get("leadName");
     const seniority = searchParams.get("seniority");
@@ -39,6 +40,8 @@ export async function GET(request: NextRequest) {
 
     // Filtre par collection (via lead_collections) - géré via join plus bas
     const filterCollectionId = collectionId ? parseInt(collectionId) : null;
+    // Filtre par dossier - leads dans des collections du dossier (si pas de collectionId)
+    const filterFolderId = folderId ? parseInt(folderId) : null;
 
     // Filtre par nom de lead (recherche dans fullName, firstName, lastName)
     if (leadName && leadName.trim() !== "") {
@@ -95,24 +98,37 @@ export async function GET(request: NextRequest) {
       ? (whereConditions.length === 1 ? whereConditions[0] : and(...whereConditions)!)
       : undefined;
 
-    // Compter le nombre total d'éléments (avec filtre collection via lead_collections)
+    // Compter le nombre total d'éléments (avec filtre collection/dossier via lead_collections)
     const countBase = db
       .select({ count: sql<number>`count(*)` })
       .from(leads)
       .leftJoin(companies, eq(leads.companyId, companies.id));
 
-    const countWithCollection = filterCollectionId
-      ? countBase.innerJoin(
-          leadCollections,
-          and(
-            eq(leadCollections.leadId, leads.id),
-            eq(leadCollections.collectionId, filterCollectionId)
-          )
+    let countWithCollection = countBase;
+    if (filterCollectionId) {
+      countWithCollection = countBase.innerJoin(
+        leadCollections,
+        and(
+          eq(leadCollections.leadId, leads.id),
+          eq(leadCollections.collectionId, filterCollectionId)
         )
-      : countBase;
+      );
+    } else if (filterFolderId) {
+      countWithCollection = countBase
+        .innerJoin(leadCollections, eq(leadCollections.leadId, leads.id))
+        .innerJoin(collections, eq(leadCollections.collectionId, collections.id));
+    }
 
-    const totalCountResult = await (finalWhereCondition
-      ? countWithCollection.where(finalWhereCondition)
+    // Combiner finalWhereCondition avec le filtre dossier si nécessaire (uniquement quand on utilise le filtre dossier)
+    const countWhereCondition =
+      filterFolderId && !filterCollectionId && finalWhereCondition
+        ? and(finalWhereCondition, eq(collections.folderId, filterFolderId))
+        : filterFolderId && !filterCollectionId
+          ? eq(collections.folderId, filterFolderId)
+          : finalWhereCondition;
+
+    const totalCountResult = await (countWhereCondition
+      ? countWithCollection.where(countWhereCondition)
       : countWithCollection);
     const totalItems = totalCountResult[0]?.count || 0;
 
@@ -125,6 +141,7 @@ export async function GET(request: NextRequest) {
         lastName: leads.lastName,
         position: leads.position,
         email: leads.email,
+        emailVerifyEmaillist: leads.emailVerifyEmaillist,
         linkedinUrl: leads.linkedinUrl,
         seniority: leads.seniority,
         functional: leads.functional,
@@ -145,19 +162,32 @@ export async function GET(request: NextRequest) {
       .from(leads)
       .leftJoin(companies, eq(leads.companyId, companies.id));
 
-    const queryWithCollection = filterCollectionId
-      ? queryBase.innerJoin(
-          leadCollections,
-          and(
-            eq(leadCollections.leadId, leads.id),
-            eq(leadCollections.collectionId, filterCollectionId)
-          )
+    let queryWithCollection = queryBase;
+    if (filterCollectionId) {
+      queryWithCollection = queryBase.innerJoin(
+        leadCollections,
+        and(
+          eq(leadCollections.leadId, leads.id),
+          eq(leadCollections.collectionId, filterCollectionId)
         )
-      : queryBase;
+      );
+    } else if (filterFolderId) {
+      queryWithCollection = queryBase
+        .innerJoin(leadCollections, eq(leadCollections.leadId, leads.id))
+        .innerJoin(collections, eq(leadCollections.collectionId, collections.id));
+    }
+
+    // Combiner finalWhereCondition avec le filtre dossier si nécessaire (uniquement quand on utilise le filtre dossier)
+    const queryWhereCondition =
+      filterFolderId && !filterCollectionId && finalWhereCondition
+        ? and(finalWhereCondition, eq(collections.folderId, filterFolderId))
+        : filterFolderId && !filterCollectionId
+          ? eq(collections.folderId, filterFolderId)
+          : finalWhereCondition;
 
     // Appliquer toutes les conditions et ordonner par date de création (plus récent en premier) et appliquer la pagination
-    const results = await (finalWhereCondition
-      ? queryWithCollection.where(finalWhereCondition)
+    const results = await (queryWhereCondition
+      ? queryWithCollection.where(queryWhereCondition)
       : queryWithCollection)
       .orderBy(desc(leads.createdAt))
       .limit(limit)

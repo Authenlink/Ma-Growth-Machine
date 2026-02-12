@@ -8,7 +8,16 @@ import { generateRandomGradient } from "@/lib/gradient-generator";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, password, name, accountType = "user" } = body;
+    const { email, password, name, accountType = "user", registrationSecret } = body;
+
+    // Validation mot de passe d'inscription (seulement toi peux creer un compte)
+    const expectedSecret = process.env.REGISTRATION_SECRET;
+    if (!expectedSecret || registrationSecret !== expectedSecret) {
+      return NextResponse.json(
+        { error: "Mot de passe d'inscription invalide" },
+        { status: 403 }
+      );
+    }
 
     // Validation de base
     if (!email || !password || !name) {

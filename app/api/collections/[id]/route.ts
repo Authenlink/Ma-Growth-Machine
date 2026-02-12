@@ -79,6 +79,7 @@ export async function GET(
         lastName: leads.lastName,
         position: leads.position,
         email: leads.email,
+        emailVerifyEmaillist: leads.emailVerifyEmaillist,
         linkedinUrl: leads.linkedinUrl,
         seniority: leads.seniority,
         functional: leads.functional,

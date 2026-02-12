@@ -5,6 +5,7 @@ import { leads, companies, scrapers, leadCollections } from "@/lib/schema";
 import { eq, and } from "drizzle-orm";
 import { getAdapter } from "@/lib/scrapers/adapter-factory";
 import { extractDomain } from "@/lib/bulk-email-finder-mapper";
+import { recordScraperRun } from "@/lib/scraper-runs";
 
 // Timeout maximum pour un run (30 minutes)
 const MAX_RUN_TIMEOUT = 30 * 60 * 1000;
@@ -206,6 +207,22 @@ export async function POST(
 
       console.error(`[Find Email] Erreur pour run ${runId}:`, errorMessage);
 
+      try {
+        await recordScraperRun({
+          runId: run.id,
+          scraperId: scraperConfig.id,
+          userId,
+          source: "find_email",
+          leadId,
+          collectionId: collectionIdForMapper,
+          itemCount: 0,
+          status: runStatus.status,
+          fetchCostFromApify: true,
+        });
+      } catch {
+        /* ignore */
+      }
+
       return NextResponse.json(
         {
           error: errorMessage,
@@ -259,6 +276,21 @@ export async function POST(
 
     // Si aucun email n'a été trouvé et qu'on a des NOT_FOUND, indiquer explicitement
     if (!foundEmail && hasNotFound) {
+      try {
+        await recordScraperRun({
+          runId: run.id,
+          scraperId: scraperConfig.id,
+          userId,
+          source: "find_email",
+          leadId,
+          collectionId: collectionIdForMapper,
+          itemCount: items.length,
+          status: runStatus.status,
+          fetchCostFromApify: true,
+        });
+      } catch {
+        /* ignore */
+      }
       return NextResponse.json({
         success: false,
         notFound: true,
@@ -273,6 +305,22 @@ export async function POST(
         },
         duration,
       });
+    }
+
+    try {
+      await recordScraperRun({
+        runId: run.id,
+        scraperId: scraperConfig.id,
+        userId,
+        source: "find_email",
+        leadId,
+        collectionId: collectionIdForMapper,
+        itemCount: items.length,
+        status: runStatus.status,
+        fetchCostFromApify: true,
+      });
+    } catch {
+      /* ignore */
     }
 
     return NextResponse.json({

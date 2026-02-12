@@ -12,10 +12,7 @@ export async function GET(request: NextRequest) {
     const session = await auth();
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: "Non authentifié" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
     const activeScrapers = await db
@@ -25,19 +22,32 @@ export async function GET(request: NextRequest) {
         description: scrapers.description,
         provider: scrapers.provider,
         mapperType: scrapers.mapperType,
+        source: scrapers.source,
+        infoType: scrapers.infoType,
+        toolUrl: scrapers.toolUrl,
+        paymentType: scrapers.paymentType,
+        costPerThousand: scrapers.costPerThousand,
+        costPerLead: scrapers.costPerLead,
+        actorStartCost: scrapers.actorStartCost,
+        freeQuotaMonthly: scrapers.freeQuotaMonthly,
+        pricingTiers: scrapers.pricingTiers,
+        usesAi: scrapers.usesAi,
       })
       .from(scrapers)
       .where(eq(scrapers.isActive, true));
 
     return NextResponse.json(activeScrapers);
   } catch (error) {
-    console.error("[Scrapers] Erreur lors de la récupération des scrapers:", error);
+    console.error(
+      "[Scrapers] Erreur lors de la récupération des scrapers:",
+      error,
+    );
     return NextResponse.json(
       {
         error: "Erreur lors de la récupération des scrapers",
         message: error instanceof Error ? error.message : "Erreur inconnue",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { collections, scrapers, companies, leads, leadCollections } from "@/lib/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { getAdapter } from "@/lib/scrapers/adapter-factory";
+import { recordScraperRun } from "@/lib/scraper-runs";
 
 // Timeout maximum pour un run (30 minutes)
 const MAX_RUN_TIMEOUT = 30 * 60 * 1000;
@@ -346,6 +347,22 @@ export async function POST(request: NextRequest) {
 
       console.error(`[Scraping] Erreur pour run ${runId}:`, errorMessage);
 
+      try {
+        await recordScraperRun({
+          runId: run.id,
+          scraperId,
+          userId,
+          source: "scraping",
+          collectionId,
+          companyId: companyId ?? null,
+          itemCount: 0,
+          status: runStatus.status,
+          fetchCostFromApify: true,
+        });
+      } catch {
+        /* ignore */
+      }
+
       return NextResponse.json(
         {
           error: errorMessage,
@@ -363,6 +380,7 @@ export async function POST(request: NextRequest) {
 
     // Mapper et sauvegarder les leads dans la DB
     // Pour le scraper linkedin-company-employees, passer companyLinkedinUrl au mapper
+    console.log(`[Scraping] Début mapToLeads (${items.length} items)`);
     let mappingResult;
     const mapperType = scraperConfig.mapperType;
     if (mapperType === "linkedin-company-employees" && companyLinkedinUrl) {
@@ -425,6 +443,24 @@ export async function POST(request: NextRequest) {
         );
       }
     }
+
+    // Enregistrer le run en arrière-plan (fire-and-forget) pour ne pas bloquer la réponse
+    console.log(`[Scraping] Début recordScraperRun`);
+    recordScraperRun({
+      runId: run.id,
+      scraperId,
+      userId,
+      source: "scraping",
+      collectionId,
+      companyId: companyId ?? null,
+      itemCount: items.length,
+      status: runStatus.status,
+      fetchCostFromApify: true,
+    })
+      .then(() => console.log(`[Scraping] recordScraperRun terminé`))
+      .catch((err) =>
+        console.error("[recordScraperRun] Erreur en arrière-plan:", err),
+      );
 
     return NextResponse.json({
       success: true,

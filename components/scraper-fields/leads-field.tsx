@@ -29,6 +29,8 @@ interface LeadsFieldProps {
   required?: boolean;
   helpText?: string;
   disabled?: boolean;
+  /** "no_email" = leads sans email (Bulk Email Finder), "has_company" = leads avec entreprise (SEO Local) */
+  filterMode?: "no_email" | "has_company";
 }
 
 export function LeadsField({
@@ -40,20 +42,27 @@ export function LeadsField({
   required = false,
   helpText,
   disabled = false,
+  filterMode = "no_email",
 }: LeadsFieldProps) {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [showAll, setShowAll] = useState(false);
-  
-  // Filtrer les leads qui ont un domaine disponible
-  const leadsWithDomain = leads.filter((lead) => {
-    if (!lead.firstName || !lead.lastName) return false;
+
+  // Filtrer selon le mode: no_email = leads sans email, has_company = leads avec entreprise
+  const filteredByMode =
+    filterMode === "has_company"
+      ? leads.filter((lead) => lead.company != null)
+      : leads.filter((lead: Lead) => !lead.email);
+
+  // Filtrer les leads qui ont un domaine disponible (pour has_company, on veut company avec nom au minimum)
+  const leadsWithDomain = filteredByMode.filter((lead) => {
+    if (!lead.company?.name) return false;
     return lead.company?.website && lead.company.website.trim() !== "";
   });
-  
-  const leadsWithoutDomain = leads.filter((lead) => {
-    if (!lead.firstName || !lead.lastName) return true;
+
+  const leadsWithoutDomain = filteredByMode.filter((lead) => {
+    if (!lead.company?.name) return true;
     return !lead.company?.website || lead.company.website.trim() === "";
   });
 
@@ -70,11 +79,7 @@ export function LeadsField({
         const response = await fetch(`/api/collections/${collectionId}/leads`);
         if (response.ok) {
           const data = await response.json();
-          // Filtrer les leads sans email (ceux qu'on veut enrichir)
-          const leadsWithoutEmail = (data.data || data).filter(
-            (lead: Lead) => !lead.email
-          );
-          setLeads(leadsWithoutEmail);
+          setLeads(data.data || data);
         }
       } catch (error) {
         console.error("Erreur lors de la récupération des leads:", error);
@@ -87,7 +92,7 @@ export function LeadsField({
   }, [collectionId]);
 
   // Filtrer les leads selon la recherche (prioriser ceux avec domaine)
-  const filteredLeads = leads.filter((lead) => {
+  const filteredLeads = filteredByMode.filter((lead) => {
     if (!search) return true;
     const searchLower = search.toLowerCase();
     const fullName = lead.fullName || `${lead.firstName || ""} ${lead.lastName || ""}`.trim();
@@ -102,12 +107,12 @@ export function LeadsField({
   
   // Séparer les leads avec et sans domaine pour l'affichage
   const filteredWithDomain = filteredLeads.filter((lead) => {
-    if (!lead.firstName || !lead.lastName) return false;
+    if (!lead.company?.name) return false;
     return lead.company?.website && lead.company.website.trim() !== "";
   });
-  
+
   const filteredWithoutDomain = filteredLeads.filter((lead) => {
-    if (!lead.firstName || !lead.lastName) return true;
+    if (!lead.company?.name) return true;
     return !lead.company?.website || lead.company.website.trim() === "";
   });
 
@@ -127,7 +132,7 @@ export function LeadsField({
     }
   };
 
-  const selectedLeads = leads.filter((lead) => value.includes(lead.id));
+  const selectedLeads = filteredByMode.filter((lead) => value.includes(lead.id));
 
   if (typeof collectionId !== "number" || !collectionId) {
     return (
@@ -161,7 +166,7 @@ export function LeadsField({
     );
   }
 
-  if (leads.length === 0) {
+  if (filteredByMode.length === 0) {
     return (
       <div className="space-y-2">
         <Label htmlFor={id}>
@@ -171,7 +176,9 @@ export function LeadsField({
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <AlertCircle className="h-4 w-4" />
           <span>
-            Aucun lead sans email trouvé dans cette collection.
+            {filterMode === "has_company"
+              ? "Aucun lead avec entreprise trouvé dans cette collection."
+              : "Aucun lead sans email trouvé dans cette collection."}
           </span>
         </div>
         {helpText && (

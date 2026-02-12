@@ -4,6 +4,8 @@ interface Collection {
   id: number;
   name: string;
   description: string | null;
+  folderName?: string | null;
+  isDefault?: boolean;
 }
 
 interface CollectionFieldProps {
@@ -46,7 +48,9 @@ export function CollectionField({
         <option value="">Sélectionner une collection</option>
         {collections.map((collection) => (
           <option key={collection.id} value={collection.id}>
-            {collection.name}
+            {collection.folderName
+              ? `${collection.name} (${collection.folderName})${collection.isDefault ? " — par défaut" : ""}`
+              : `${collection.name}${collection.isDefault ? " — par défaut" : ""}`}
           </option>
         ))}
       </select>
