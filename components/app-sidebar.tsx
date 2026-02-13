@@ -12,6 +12,7 @@ import {
   Zap,
   Settings,
   Sparkles,
+  Bot,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 
@@ -30,20 +31,14 @@ import {
 } from "@/components/ui/sidebar";
 
 // ============================================================
-// ITEMS DE NAVIGATION - Growth Machine
+// ITEMS DE NAVIGATION - Growth Machine (par catégories)
 // ============================================================
-const navItems = [
+const navOverview = [
   {
     title: "Dashboard",
     url: "/dashboard",
     icon: LayoutDashboard,
     isActive: true,
-  },
-  {
-    title: "Scraping",
-    url: "/leads/scrape",
-    icon: Sparkles,
-    isActive: false,
   },
   {
     title: "Leads",
@@ -69,6 +64,15 @@ const navItems = [
     url: "/leads/collections",
     icon: FolderOpen,
   },
+];
+
+const navTools = [
+  {
+    title: "Scraping",
+    url: "/leads/scrape",
+    icon: Sparkles,
+    isActive: false,
+  },
   {
     title: "Enrichissement",
     url: "/enrichment",
@@ -81,27 +85,18 @@ const navItems = [
       { title: "Avis Trustpilot", url: "/enrichment/trustpilot" },
     ],
   },
-  // {
-  //   title: "Campagnes",
-  //   url: "/campaigns",
-  //   icon: Target,
-  //   items: [
-  //     { title: "Toutes les campagnes", url: "/campaigns" },
-  //     { title: "Nouvelle campagne", url: "/campaigns/new" },
-  //     { title: "Rapports", url: "/campaigns/reports" },
-  //     { title: "Performances", url: "/campaigns/analytics" },
-  //   ],
-  // },
-  // {
-  //   title: "IceBreakers",
-  //   url: "/icebreakers",
-  //   icon: MessageSquare,
-  //   items: [
-  //     { title: "Générer pour liste", url: "/icebreakers/generate" },
-  //     { title: "Templates", url: "/icebreakers/templates" },
-  //     { title: "Historique", url: "/icebreakers/history" },
-  //   ],
-  // },
+  {
+    title: "Agents IA",
+    url: "/aiagents",
+    icon: Bot,
+    items: [
+      { title: "Toutes les agents", url: "/aiagents" },
+      { title: "Nouvelle agent", url: "/aiagents/new" },
+    ],
+  },
+];
+
+const navActions = [
   {
     title: "Actions",
     url: "/actions",
@@ -196,7 +191,7 @@ function SidebarWithNav(
       color2: string;
       css: string;
     } | null;
-  }
+  },
 ) {
   const { user, backgroundGradient, ...sidebarProps } = props;
   const { setOpen, setOpenMobile, isMobile } = useSidebar();
@@ -240,7 +235,9 @@ function SidebarWithNav(
 
       {/* Contenu : Navigation */}
       <SidebarContent>
-        <NavMain items={navItems} />
+        <NavMain label="Vue d'ensemble" items={navOverview} />
+        <NavMain label="Outils" items={navTools} />
+        <NavMain label="Actions" items={navActions} />
       </SidebarContent>
 
       {/* Footer : Menu utilisateur */}

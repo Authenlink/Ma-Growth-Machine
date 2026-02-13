@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/collapsible";
 import {
   SidebarGroup,
+  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -39,6 +40,7 @@ function isItemActive(
 
 export function NavMain({
   items,
+  label,
 }: {
   items: {
     title: string;
@@ -50,6 +52,7 @@ export function NavMain({
       url: string;
     }[];
   }[];
+  label?: string;
 }) {
   const pathname = usePathname()
   const { state, setOpen, setOpenMobile, isMobile } = useSidebar()
@@ -79,6 +82,7 @@ export function NavMain({
 
   return (
     <SidebarGroup>
+      {label && <SidebarGroupLabel>{label}</SidebarGroupLabel>}
       <SidebarMenu>
         {items.map((item) => {
           // Items sans sous-items : lien direct
