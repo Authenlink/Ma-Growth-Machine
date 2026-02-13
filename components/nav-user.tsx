@@ -147,6 +147,10 @@ export function NavUser({
                   <Circle className="h-4 w-4 mr-2" />
                   Light
                 </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="shadow">
+                  <Circle className="h-4 w-4 mr-2" />
+                  Shadow
+                </DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="dark">
                   <Moon className="h-4 w-4 mr-2" />
                   Dark

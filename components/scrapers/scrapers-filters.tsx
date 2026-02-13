@@ -1,6 +1,6 @@
 "use client";
 
-import { Cloud, Database, Info, CreditCard, X } from "lucide-react";
+import { Cloud, Database, Info, CreditCard, X, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScraperFilterDropdown } from "@/components/scrapers/scraper-filter-dropdown";
 import type { ScraperFilterOption } from "@/components/scrapers/scraper-filter-dropdown";
@@ -12,6 +12,7 @@ import {
 } from "@/lib/scraper-filter-options";
 
 export type ScrapersFiltersState = {
+  search?: string;
   provider?: string[];
   source?: string[];
   infoType?: string[];
@@ -69,6 +70,7 @@ export function ScrapersFilters({
   );
 
   const hasActiveFilter =
+    (filters.search?.length ?? 0) > 0 ||
     (filters.provider?.length ?? 0) > 0 ||
     (filters.source?.length ?? 0) > 0 ||
     (filters.infoType?.length ?? 0) > 0 ||
@@ -90,6 +92,13 @@ export function ScrapersFilters({
     });
   };
 
+  const handleSearchChange = (search: string) => {
+    onFiltersChange({
+      ...filters,
+      search: search.trim() || undefined,
+    });
+  };
+
   const handleReset = () => {
     onFiltersChange({});
   };
@@ -97,6 +106,16 @@ export function ScrapersFilters({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Rechercher un scraper..."
+            value={filters.search || ""}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            className="pl-10 pr-4 py-2 border border-input bg-background rounded-md text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 min-w-[250px]"
+          />
+        </div>
         <ScraperFilterDropdown
           label="Provider"
           icon={Cloud}

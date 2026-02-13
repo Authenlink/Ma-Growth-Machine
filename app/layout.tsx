@@ -8,11 +8,13 @@ import { Toaster } from "@/components/ui/sonner";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  fallback: ["system-ui", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "sans-serif"],
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  fallback: ["Monaco", "Consolas", "Liberation Mono", "Courier New", "monospace"],
 });
 
 export const metadata: Metadata = {
@@ -36,6 +38,7 @@ export default function RootLayout({
           defaultTheme="white"
           enableSystem
           disableTransitionOnChange
+          themes={["white", "light", "dark", "shadow"]}
         >
           <Providers>{children}</Providers>
           <Toaster />

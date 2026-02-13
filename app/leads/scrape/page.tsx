@@ -113,6 +113,16 @@ export default function ScrapePage() {
 
   // Scrapers filtrés (AND entre dimensions, OR à l'intérieur)
   const filteredScrapers = scrapers.filter((s) => {
+    // Recherche textuelle par nom ou description
+    if (filters.search) {
+      const searchTerm = filters.search.toLowerCase();
+      const nameMatch = s.name.toLowerCase().includes(searchTerm);
+      const descriptionMatch = (s.description || "").toLowerCase().includes(searchTerm);
+      if (!nameMatch && !descriptionMatch) {
+        return false;
+      }
+    }
+
     if (filters.provider?.length && !filters.provider.includes(s.provider)) {
       return false;
     }
