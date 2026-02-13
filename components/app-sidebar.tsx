@@ -26,7 +26,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar";
 
@@ -248,9 +247,6 @@ function SidebarWithNav(
       <SidebarFooter>
         <NavUser user={user} backgroundGradient={backgroundGradient} />
       </SidebarFooter>
-
-      {/* Rail : handle pour collapse/expand */}
-      <SidebarRail />
     </Sidebar>
   );
 }

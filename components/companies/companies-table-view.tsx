@@ -56,15 +56,15 @@ export function CompaniesTableView({ companies }: CompaniesTableViewProps) {
   }
 
   const headerCellClass =
-    "h-10 px-3 text-left align-middle font-medium text-xs border-r border-border last:border-r-0 sticky top-0 bg-muted z-[2]";
-  const stickyCol = "sticky left-0 z-[3] min-w-[180px] border-r border-border shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]";
+    "h-10 px-4 py-2 text-left align-middle font-medium text-sm border-b border-border sticky top-0 bg-background z-[2]";
+  const stickyCol = "sticky left-0 z-[3] min-w-[180px] border-r border-border";
   const cellClass =
-    "px-3 py-2 align-middle text-sm border-r border-border last:border-r-0 whitespace-nowrap";
-  const getStickyCellClass = (isEvenRow: boolean) =>
-    `${cellClass} sticky left-0 z-[1] min-w-[180px] border-r border-border shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] ${isEvenRow ? "bg-muted" : "bg-background"}`;
+    "px-4 py-2 align-middle text-sm whitespace-nowrap";
+  const getStickyCellClass = () =>
+    `${cellClass} sticky left-0 z-[1] min-w-[180px] border-r border-border bg-background`;
 
   return (
-    <div className="w-full min-w-0">
+    <div className="w-full min-w-0 rounded-md border">
       <div className="min-w-max">
         <table className="w-full min-w-max border-collapse">
           <thead>
@@ -80,18 +80,17 @@ export function CompaniesTableView({ companies }: CompaniesTableViewProps) {
             </tr>
           </thead>
           <tbody>
-            {companies.map((company, index) => {
+            {companies.map((company) => {
               const location = getLocation(company);
               const foundedInfo = getFoundedInfo(company);
-              const isEvenRow = index % 2 === 1;
 
               return (
                 <tr
                   key={company.id}
-                  className="border-b border-border transition-colors hover:bg-muted/50 cursor-pointer even:bg-muted/30"
+                  className="border-b border-border hover:bg-muted/50 cursor-pointer"
                   onClick={() => (window.location.href = `/companies/${company.id}`)}
                 >
-                  <td className={getStickyCellClass(isEvenRow)}>
+                  <td className={getStickyCellClass()}>
                     <Link
                       href={`/companies/${company.id}`}
                       onClick={(e) => e.stopPropagation()}
