@@ -103,7 +103,7 @@ export default function DashboardPage() {
   const hasScrolled = useScroll();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [chartData, setChartData] = useState<ChartData[]>([]);
-  const [timeRange, setTimeRange] = useState("7d");
+  const [timeRange, setTimeRange] = useState("30d");
   const [loadingStats, setLoadingStats] = useState(true);
   const [loadingChart, setLoadingChart] = useState(true);
 
@@ -113,7 +113,7 @@ export default function DashboardPage() {
   const [chartSpendingData, setChartSpendingData] = useState<
     ChartSpendingData[]
   >([]);
-  const [spendingTimeRange, setSpendingTimeRange] = useState("7d");
+  const [spendingTimeRange, setSpendingTimeRange] = useState("30d");
   const [loadingSpending, setLoadingSpending] = useState(true);
   const [loadingSpendingChart, setLoadingSpendingChart] = useState(true);
 
