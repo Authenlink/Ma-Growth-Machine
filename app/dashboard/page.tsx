@@ -459,7 +459,10 @@ export default function DashboardPage() {
                     config={chartConfig}
                     className="aspect-auto h-[250px] w-full"
                   >
-                    <AreaChart data={chartData}>
+                    <AreaChart
+                      data={chartData}
+                      margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+                    >
                       <defs>
                         <linearGradient
                           id="fillLeads"
@@ -499,6 +502,13 @@ export default function DashboardPage() {
                         </linearGradient>
                       </defs>
                       <CartesianGrid vertical={false} />
+                      <YAxis
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(v) => `${v}`}
+                        domain={[0, "auto"]}
+                        width={30}
+                      />
                       <XAxis
                         dataKey="date"
                         tickLine={false}
