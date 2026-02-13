@@ -12,6 +12,7 @@ import {
   Plus,
   Users,
   ShieldCheck,
+  Copy,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -55,7 +56,14 @@ import { LeadsFilters } from "@/components/leads/leads-filters";
 import { LeadsCardView } from "@/components/leads/leads-card-view";
 import { LeadsTableView } from "@/components/leads/leads-table-view";
 import { Pagination, PaginationInfo } from "@/components/ui/pagination";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { toast } from "sonner";
 
 interface Collection {
@@ -358,7 +366,7 @@ export default function CollectionDetailPage({ params }: Props) {
     return (
       <SidebarProvider>
         <AppSidebar />
-        <SidebarInset>
+        <SidebarInset className="flex h-dvh flex-col overflow-hidden">
           <header className="flex h-16 shrink-0 items-center gap-2">
             <div className="flex items-center gap-2 px-4">
               <Skeleton className="h-6 w-6" />
@@ -369,10 +377,10 @@ export default function CollectionDetailPage({ params }: Props) {
               <Skeleton className="h-4 w-32" />
             </div>
           </header>
-          <div className="flex flex-1 flex-col gap-4 p-4 pt-6">
-            <Skeleton className="h-8 w-64 mb-2" />
-            <Skeleton className="h-32 w-full rounded-xl" />
-            <Skeleton className="h-64 w-full rounded-xl" />
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 p-4 pt-6 overflow-hidden">
+            <Skeleton className="h-8 w-64 shrink-0" />
+            <Skeleton className="h-12 w-full shrink-0 rounded-xl" />
+            <Skeleton className="min-h-0 flex-1 w-full rounded-xl" />
           </div>
         </SidebarInset>
       </SidebarProvider>
@@ -388,9 +396,9 @@ export default function CollectionDetailPage({ params }: Props) {
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset>
+      <SidebarInset className="flex h-dvh flex-col overflow-hidden">
         <header
-          className={`sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 ${
+          className={`flex h-16 shrink-0 items-center gap-2 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 ${
             hasScrolled ? "border-b" : ""
           }`}
         >
@@ -430,15 +438,28 @@ export default function CollectionDetailPage({ params }: Props) {
           </div>
         </header>
 
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-6">
-          {/* Header avec bouton retour */}
-          <div className="flex items-center justify-between mb-2">
-            <Button variant="ghost" asChild className="gap-2">
-              <Link href="/leads/collections">
-                <ArrowLeft className="h-4 w-4" />
-                Retour aux collections
-              </Link>
-            </Button>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 p-4 pt-6 overflow-hidden">
+          {/* Header aligné avec Tous les leads */}
+          <div className="flex shrink-0 items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Button variant="ghost" asChild size="sm" className="gap-2 -ml-2">
+                <Link href="/leads/collections">
+                  <ArrowLeft className="h-4 w-4" />
+                  Retour aux collections
+                </Link>
+              </Button>
+              <Separator orientation="vertical" className="h-6" />
+              <div>
+                <h1 className="text-2xl font-bold">
+                  {collectionData.collection.name}
+                </h1>
+                <p className="text-muted-foreground">
+                  {collectionData.leads.pagination.totalItems} lead
+                  {collectionData.leads.pagination.totalItems !== 1 ? "s" : ""}{" "}
+                  dans cette collection
+                </p>
+              </div>
+            </div>
             <div className="flex items-center gap-2">
               <Button
                 variant={viewMode === "cards" ? "default" : "outline"}
@@ -458,103 +479,103 @@ export default function CollectionDetailPage({ params }: Props) {
                 <Table2 className="h-4 w-4" />
                 Table
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleOpenVerifyDialog}
+                disabled={
+                  verifyingEmails ||
+                  collectionData.leads.pagination.totalItems === 0
+                }
+                className="gap-2"
+              >
+                <ShieldCheck className="h-4 w-4" />
+                {verifyingEmails
+                  ? "Vérification en cours..."
+                  : "Vérifier les emails"}
+              </Button>
+              <Button asChild size="sm" className="gap-2">
+                <Link
+                  href={`/leads/scrape?collectionId=${collectionData.collection.id}`}
+                >
+                  <Plus className="h-4 w-4" />
+                  Ajouter des leads
+                </Link>
+              </Button>
             </div>
           </div>
 
-          {/* Informations de la collection */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-            <Card className="lg:col-span-2">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FolderOpen className="h-5 w-5" />
-                  {collectionData.collection.name}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Description</p>
-                    <p className="text-sm font-medium">
-                      {collectionData.collection.description ||
-                        "Aucune description"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">
-                      Nombre de leads
-                    </p>
-                    <p className="text-sm font-medium flex items-center gap-1">
-                      <Users className="h-4 w-4" />
-                      {collectionData.leads.pagination.totalItems}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Créée le</p>
-                    <p className="text-sm font-medium">
-                      {new Date(
-                        collectionData.collection.createdAt,
-                      ).toLocaleDateString("fr-FR")}
-                    </p>
-                  </div>
+          {/* Infos collection sur une ligne */}
+          <Card className="shrink-0">
+            <CardContent className="py-3 px-4">
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">
+                    {collectionData.collection.name}
+                  </span>
                 </div>
-              </CardContent>
-            </Card>
-            <DuplicatesCard
-              collectionId={collectionData.collection.id}
-              onCleaned={() => fetchCollectionData(1)}
-            />
-          </div>
+                <Separator orientation="vertical" className="h-4" />
+                <span className="max-w-[200px] truncate text-sm text-muted-foreground">
+                  {collectionData.collection.description || "Aucune description"}
+                </span>
+                <Separator orientation="vertical" className="h-4" />
+                <Badge variant="secondary" className="gap-1">
+                  <Users className="h-3 w-3" />
+                  {collectionData.leads.pagination.totalItems} leads
+                </Badge>
+                <Separator orientation="vertical" className="h-4" />
+                <span className="text-sm text-muted-foreground">
+                  Créée le{" "}
+                  {new Date(
+                    collectionData.collection.createdAt,
+                  ).toLocaleDateString("fr-FR")}
+                </span>
+                <div className="ml-auto">
+                  <Sheet>
+                    <SheetTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-2">
+                        <Copy className="h-4 w-4" />
+                        Vérifier les doublons
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent
+                      side="right"
+                      className="sm:max-w-md overflow-y-auto"
+                    >
+                      <SheetTitle className="sr-only">
+                        Vérifier les doublons
+                      </SheetTitle>
+                      <div className="pt-2">
+                        <DuplicatesCard
+                          collectionId={collectionData.collection.id}
+                          onCleaned={() => {
+                            fetchCollectionData(1);
+                          }}
+                        />
+                      </div>
+                    </SheetContent>
+                  </Sheet>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Section leads */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div>
-                <h2 className="text-xl font-semibold">Leads</h2>
-                <p className="text-muted-foreground">
-                  {collectionData.leads.pagination.totalItems} lead
-                  {collectionData.leads.pagination.totalItems !== 1
-                    ? "s"
-                    : ""}{" "}
-                  dans cette collection
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  onClick={handleOpenVerifyDialog}
-                  disabled={
-                    verifyingEmails ||
-                    collectionData.leads.pagination.totalItems === 0
-                  }
-                  className="gap-2"
-                >
-                  <ShieldCheck className="h-4 w-4" />
-                  {verifyingEmails
-                    ? "Vérification en cours..."
-                    : "Vérifier les emails"}
-                </Button>
-                <Button asChild>
-                  <Link
-                    href={`/leads/scrape?collectionId=${collectionData.collection.id}`}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Ajouter des leads
-                  </Link>
-                </Button>
-              </div>
-            </div>
-
+          <div className="flex min-h-0 flex-1 flex-col gap-4 min-w-0">
             {collectionData.leads.data.length === 0 ? (
-              <EmptyState
-                title="Aucun lead dans cette collection"
-                description="Commencez par scraper des leads pour cette collection."
-                actionLabel="Scraper des leads"
-                actionHref={`/leads/scrape?collectionId=${collectionData.collection.id}`}
-                icon={FolderOpen}
-              />
+              <div className="flex min-h-0 flex-1 items-center justify-center">
+                <EmptyState
+                  title="Aucun lead dans cette collection"
+                  description="Commencez par scraper des leads pour cette collection."
+                  actionLabel="Scraper des leads"
+                  actionHref={`/leads/scrape?collectionId=${collectionData.collection.id}`}
+                  icon={FolderOpen}
+                />
+              </div>
             ) : (
               <>
-                {filteredLeads.length > 0 && (
+                <div className="shrink-0 space-y-2">
                   <LeadsFilters
                     collections={[]}
                     folders={[]}
@@ -562,31 +583,34 @@ export default function CollectionDetailPage({ params }: Props) {
                     onFiltersChange={setFilters}
                     resultCount={collectionData.leads.pagination.totalItems}
                   />
-                )}
+                </div>
 
                 {filteredLeads.length === 0 ? (
-                  <EmptyState
-                    title="Aucun lead trouvé"
-                    description="Aucun lead ne correspond à vos critères de recherche. Essayez de modifier vos filtres."
-                    icon={FolderOpen}
-                  />
+                  <div className="flex min-h-0 flex-1 items-center justify-center">
+                    <EmptyState
+                      title="Aucun lead trouvé"
+                      description="Aucun lead ne correspond à vos critères de recherche. Essayez de modifier vos filtres."
+                      icon={FolderOpen}
+                    />
+                  </div>
                 ) : (
                   <>
-                    {viewMode === "cards" ? (
-                      <LeadsCardView
-                        leads={filteredLeads}
-                        onDeleteLead={handleDeleteLead}
-                      />
-                    ) : (
-                      <LeadsTableView
-                        leads={filteredLeads}
-                        onDeleteLead={handleDeleteLead}
-                      />
-                    )}
+                    <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-border/80 scrollbar-table">
+                      {viewMode === "cards" ? (
+                        <LeadsCardView
+                          leads={filteredLeads}
+                          onDeleteLead={handleDeleteLead}
+                        />
+                      ) : (
+                        <LeadsTableView
+                          leads={filteredLeads}
+                          onDeleteLead={handleDeleteLead}
+                        />
+                      )}
+                    </div>
 
-                    {/* Pagination */}
                     {collectionData.leads.pagination.totalPages > 1 && (
-                      <div className="mt-6 space-y-4">
+                      <div className="shrink-0 space-y-4 pt-2">
                         <PaginationInfo
                           currentPage={currentPage}
                           totalItems={

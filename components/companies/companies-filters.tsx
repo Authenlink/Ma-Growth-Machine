@@ -38,7 +38,12 @@ export function CompaniesFilters({
   }, [filters]);
 
   const handleFilterChange = (key: string, value: string | undefined) => {
-    if (key === "sourceTypes" || key === "scoreCategory" || key === "verifiedEmail") return;
+    if (
+      key === "sourceTypes" ||
+      key === "scoreCategory" ||
+      key === "verifiedEmail"
+    )
+      return;
     const newFilters = { ...localFilters };
     if (value === "" || value === undefined) {
       delete newFilters[key as keyof typeof newFilters];
@@ -96,65 +101,69 @@ export function CompaniesFilters({
   return (
     <div className="space-y-4">
       {/* Une seule ligne : Filtres avancés, Nom entreprise, Industrie, Sources, Note, Email vérifié */}
-      <div className="rounded-xl border border-border/80 bg-card/30 p-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-2 border border-border/80"
-            onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
-          >
-            <Filter className="h-4 w-4" />
-            Filtres avancés
-            {isAdvancedOpen ? (
-              <ChevronUp className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
-          </Button>
-          <Input
-            id="filter-company-name"
-            placeholder="Nom entreprise..."
-            className="h-8 w-[160px] min-w-[140px]"
-            value={localFilters.name || ""}
-            onChange={(e) =>
-              handleFilterChange("name", e.target.value || undefined)
-            }
-          />
-          <Input
-            id="filter-industry"
-            placeholder="Industrie..."
-            className="h-8 w-[160px] min-w-[140px]"
-            value={localFilters.industry || ""}
-            onChange={(e) =>
-              handleFilterChange("industry", e.target.value || undefined)
-            }
-          />
-          <SourcesFilterDropdown
-            selectedSourceTypes={filters.sourceTypes ?? []}
-            onChange={handleSourceTypesChange}
-          />
-          <ScoreFilterDropdown
-            entityType="company"
-            selectedCategory={filters.scoreCategory}
-            onChange={handleScoreCategoryChange}
-          />
-          <VerifiedEmailFilterDropdown
-            selectedFilter={filters.verifiedEmail as "verified" | "unverified" | "all" | undefined}
-            onChange={handleVerifiedEmailChange}
-          />
-          {hasActiveFilters && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleResetFilters}
-              className="gap-2"
-            >
-              <X className="h-4 w-4" />
-              Réinitialiser
-            </Button>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-2 border border-border/80"
+          onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
+        >
+          <Filter className="h-4 w-4" />
+          Filtres avancés
+          {isAdvancedOpen ? (
+            <ChevronUp className="h-4 w-4" />
+          ) : (
+            <ChevronDown className="h-4 w-4" />
           )}
-        </div>
+        </Button>
+        <Input
+          id="filter-company-name"
+          placeholder="Nom entreprise..."
+          className="h-8 w-[160px] min-w-[140px]"
+          value={localFilters.name || ""}
+          onChange={(e) =>
+            handleFilterChange("name", e.target.value || undefined)
+          }
+        />
+        <Input
+          id="filter-industry"
+          placeholder="Industrie..."
+          className="h-8 w-[160px] min-w-[140px]"
+          value={localFilters.industry || ""}
+          onChange={(e) =>
+            handleFilterChange("industry", e.target.value || undefined)
+          }
+        />
+        <SourcesFilterDropdown
+          selectedSourceTypes={filters.sourceTypes ?? []}
+          onChange={handleSourceTypesChange}
+        />
+        <ScoreFilterDropdown
+          entityType="company"
+          selectedCategory={filters.scoreCategory}
+          onChange={handleScoreCategoryChange}
+        />
+        <VerifiedEmailFilterDropdown
+          selectedFilter={
+            filters.verifiedEmail as
+              | "verified"
+              | "unverified"
+              | "all"
+              | undefined
+          }
+          onChange={handleVerifiedEmailChange}
+        />
+        {hasActiveFilters && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleResetFilters}
+            className="gap-2"
+          >
+            <X className="h-4 w-4" />
+            Réinitialiser
+          </Button>
+        )}
       </div>
 
       {/* Compteur de résultats */}

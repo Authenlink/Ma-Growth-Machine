@@ -66,7 +66,12 @@ export function LeadsFilters({
   }, [filters]);
 
   const handleFilterChange = (key: string, value: string | undefined) => {
-    if (key === "sourceTypes" || key === "scoreCategory" || key === "verifiedEmail") return;
+    if (
+      key === "sourceTypes" ||
+      key === "scoreCategory" ||
+      key === "verifiedEmail"
+    )
+      return;
     const newFilters = { ...localFilters };
     // "all" est utilisé pour représenter "tous" / valeur vide
     if (value === "all" || value === "" || value === undefined) {
@@ -129,7 +134,7 @@ export function LeadsFilters({
   const filteredCollections =
     selectedFolderId && !isNaN(selectedFolderId)
       ? collections.filter(
-          (c) => c.folderId !== null && c.folderId === selectedFolderId
+          (c) => c.folderId !== null && c.folderId === selectedFolderId,
         )
       : collections;
 
@@ -149,111 +154,118 @@ export function LeadsFilters({
   return (
     <div className="space-y-4">
       {/* Une seule ligne : Filtres avancés, Dossier, Collection, Nom entreprise, Nom lead, Sources, Note, Email vérifié */}
-      <div className="rounded-xl border border-border/80 bg-card/30 p-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-2 border border-border/80"
-            onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
-          >
-            <Filter className="h-4 w-4" />
-            Filtres avancés
-            {isAdvancedOpen ? (
-              <ChevronUp className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
-          </Button>
-          <Select
-            value={localFilters.folderId || "all"}
-            onValueChange={handleFolderChange}
-          >
-            <SelectTrigger id="filter-folder" size="sm" className="h-8 min-w-[140px]">
-              <SelectValue placeholder="Tous les dossiers" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tous les dossiers</SelectItem>
-              {folders.map((folder) => (
-                <SelectItem key={folder.id} value={folder.id.toString()}>
-                  {folder.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={
-              localFilters.collectionId &&
-              filteredCollections.some(
-                (c) => c.id.toString() === localFilters.collectionId
-              )
-                ? localFilters.collectionId
-                : "all"
-            }
-            onValueChange={(value) =>
-              handleFilterChange("collectionId", value)
-            }
-          >
-            <SelectTrigger id="filter-collection" size="sm" className="h-8 min-w-[140px]">
-              <SelectValue placeholder="Toutes les collections" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Toutes les collections</SelectItem>
-              {filteredCollections.map((collection) => (
-                <SelectItem
-                  key={collection.id}
-                  value={collection.id.toString()}
-                >
-                  {collection.folderName
-                    ? `${collection.name} (${collection.folderName})${collection.isDefault ? " — par défaut" : ""}`
-                    : `${collection.name}${collection.isDefault ? " — par défaut" : ""}`}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Input
-            id="filter-company-name"
-            placeholder="Nom entreprise..."
-            className="h-8 w-[160px] min-w-[140px]"
-            value={localFilters.companyName || ""}
-            onChange={(e) =>
-              handleFilterChange("companyName", e.target.value || undefined)
-            }
-          />
-          <Input
-            id="filter-lead-name"
-            placeholder="Nom lead..."
-            className="h-8 w-[160px] min-w-[140px]"
-            value={localFilters.leadName || ""}
-            onChange={(e) =>
-              handleFilterChange("leadName", e.target.value || undefined)
-            }
-          />
-          <SourcesFilterDropdown
-            selectedSourceTypes={filters.sourceTypes ?? []}
-            onChange={handleSourceTypesChange}
-          />
-          <ScoreFilterDropdown
-            entityType="lead"
-            selectedCategory={filters.scoreCategory}
-            onChange={handleScoreCategoryChange}
-          />
-          <VerifiedEmailFilterDropdown
-            selectedFilter={filters.verifiedEmail as "verified" | "unverified" | "all" | undefined}
-            onChange={handleVerifiedEmailChange}
-          />
-          {hasActiveFilters && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleResetFilters}
-              className="gap-2"
-            >
-              <X className="h-4 w-4" />
-              Réinitialiser
-            </Button>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-2 border border-border/80"
+          onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
+        >
+          <Filter className="h-4 w-4" />
+          Filtres avancés
+          {isAdvancedOpen ? (
+            <ChevronUp className="h-4 w-4" />
+          ) : (
+            <ChevronDown className="h-4 w-4" />
           )}
-        </div>
+        </Button>
+        <Select
+          value={localFilters.folderId || "all"}
+          onValueChange={handleFolderChange}
+        >
+          <SelectTrigger
+            id="filter-folder"
+            size="sm"
+            className="h-8 min-w-[140px]"
+          >
+            <SelectValue placeholder="Tous les dossiers" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous les dossiers</SelectItem>
+            {folders.map((folder) => (
+              <SelectItem key={folder.id} value={folder.id.toString()}>
+                {folder.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={
+            localFilters.collectionId &&
+            filteredCollections.some(
+              (c) => c.id.toString() === localFilters.collectionId,
+            )
+              ? localFilters.collectionId
+              : "all"
+          }
+          onValueChange={(value) => handleFilterChange("collectionId", value)}
+        >
+          <SelectTrigger
+            id="filter-collection"
+            size="sm"
+            className="h-8 min-w-[140px]"
+          >
+            <SelectValue placeholder="Toutes les collections" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Toutes les collections</SelectItem>
+            {filteredCollections.map((collection) => (
+              <SelectItem key={collection.id} value={collection.id.toString()}>
+                {collection.folderName
+                  ? `${collection.name} (${collection.folderName})${collection.isDefault ? " — par défaut" : ""}`
+                  : `${collection.name}${collection.isDefault ? " — par défaut" : ""}`}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Input
+          id="filter-company-name"
+          placeholder="Nom entreprise..."
+          className="h-8 w-[160px] min-w-[140px]"
+          value={localFilters.companyName || ""}
+          onChange={(e) =>
+            handleFilterChange("companyName", e.target.value || undefined)
+          }
+        />
+        <Input
+          id="filter-lead-name"
+          placeholder="Nom lead..."
+          className="h-8 w-[160px] min-w-[140px]"
+          value={localFilters.leadName || ""}
+          onChange={(e) =>
+            handleFilterChange("leadName", e.target.value || undefined)
+          }
+        />
+        <SourcesFilterDropdown
+          selectedSourceTypes={filters.sourceTypes ?? []}
+          onChange={handleSourceTypesChange}
+        />
+        <ScoreFilterDropdown
+          entityType="lead"
+          selectedCategory={filters.scoreCategory}
+          onChange={handleScoreCategoryChange}
+        />
+        <VerifiedEmailFilterDropdown
+          selectedFilter={
+            filters.verifiedEmail as
+              | "verified"
+              | "unverified"
+              | "all"
+              | undefined
+          }
+          onChange={handleVerifiedEmailChange}
+        />
+        {hasActiveFilters && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleResetFilters}
+            className="gap-2"
+          >
+            <X className="h-4 w-4" />
+            Réinitialiser
+          </Button>
+        )}
       </div>
 
       {/* Compteur de résultats */}
@@ -268,7 +280,7 @@ export function LeadsFilters({
       <div className="flex flex-col gap-4">
         {isAdvancedOpen && (
           <div className="rounded-xl border border-border/80 bg-card/30 p-4 w-full">
-              <FieldGroup className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <FieldGroup className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <Field>
                 <FieldLabel htmlFor="filter-seniority">Seniority</FieldLabel>
                 <Input
@@ -290,7 +302,7 @@ export function LeadsFilters({
                   onChange={(e) =>
                     handleFilterChange(
                       "functional",
-                      e.target.value || undefined
+                      e.target.value || undefined,
                     )
                   }
                 />
@@ -322,7 +334,9 @@ export function LeadsFilters({
 
               <Field>
                 <div className="flex items-center justify-between">
-                  <FieldLabel htmlFor="filter-validated" className="mb-0">Validé</FieldLabel>
+                  <FieldLabel htmlFor="filter-validated" className="mb-0">
+                    Validé
+                  </FieldLabel>
                   <p className="text-xs text-muted-foreground">
                     Filtrer par statut de validation
                   </p>
@@ -330,10 +344,7 @@ export function LeadsFilters({
                 <Select
                   value={localFilters.validated || "all"}
                   onValueChange={(value) =>
-                    handleFilterChange(
-                      "validated",
-                      value
-                    )
+                    handleFilterChange("validated", value)
                   }
                 >
                   <SelectTrigger id="filter-validated">
