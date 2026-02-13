@@ -725,6 +725,7 @@ export default function DashboardPage() {
                         type="natural"
                         fill="url(#fillSpendingFailed)"
                         stroke="var(--color-failed)"
+                        strokeWidth={2}
                         stackId="runs"
                         yAxisId="right"
                       />
@@ -733,6 +734,7 @@ export default function DashboardPage() {
                         type="natural"
                         fill="url(#fillSpendingSucceeded)"
                         stroke="var(--color-succeeded)"
+                        strokeWidth={2}
                         stackId="runs"
                         yAxisId="right"
                       />
@@ -741,6 +743,7 @@ export default function DashboardPage() {
                         type="natural"
                         fill="url(#fillSpendingCostUsd)"
                         stroke="var(--color-costUsd)"
+                        strokeWidth={2}
                         yAxisId="left"
                       />
                       <ChartLegend content={<ChartLegendContent />} />

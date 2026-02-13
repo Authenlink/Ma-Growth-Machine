@@ -107,7 +107,7 @@ export default function CompaniesPage() {
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset>
+      <SidebarInset className="flex h-dvh flex-col overflow-hidden">
         <header className="flex h-16 shrink-0 items-center gap-2">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
@@ -131,8 +131,8 @@ export default function CompaniesPage() {
           </div>
         </header>
 
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-6 overflow-x-hidden">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-2">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 p-4 pt-6 overflow-hidden">
+          <div className="flex shrink-0 flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold tracking-tight">Entreprises</h1>
               <p className="text-muted-foreground mt-1">
@@ -161,51 +161,58 @@ export default function CompaniesPage() {
             </div>
           </div>
 
-          <div className="space-y-4">
-            <CompaniesFilters
-              filters={filters}
-              onFiltersChange={setFilters}
-              resultCount={pagination?.totalItems || 0}
-            />
+          <div className="flex min-h-0 flex-1 flex-col gap-4 min-w-0">
+            <div className="shrink-0">
+              <CompaniesFilters
+                filters={filters}
+                onFiltersChange={setFilters}
+                resultCount={pagination?.totalItems || 0}
+              />
+            </div>
 
             {loadingCompanies ? (
-              <div className="space-y-4">
-                {viewMode === "cards" ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {[...Array(6)].map((_, i) => (
-                      <Skeleton key={i} className="h-64 rounded-lg" />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <Skeleton className="h-12 w-full rounded-md" />
-                    {[...Array(5)].map((_, i) => (
-                      <Skeleton key={i} className="h-16 w-full rounded-md" />
-                    ))}
-                  </div>
-                )}
+              <div className="flex min-h-0 flex-1 overflow-auto rounded-xl border border-border/80 scrollbar-table">
+                <div className="w-full space-y-4">
+                  {viewMode === "cards" ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {[...Array(6)].map((_, i) => (
+                        <Skeleton key={i} className="h-64 rounded-lg" />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Skeleton className="h-12 w-full rounded-md" />
+                      {[...Array(5)].map((_, i) => (
+                        <Skeleton key={i} className="h-16 w-full rounded-md" />
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             ) : companies.length === 0 ? (
-              <EmptyState
-                title="Aucune entreprise trouvée"
-                description={
-                  Object.keys(filters).length > 0
-                    ? "Aucune entreprise ne correspond à vos critères de recherche. Essayez de modifier vos filtres."
-                    : "Vous n'avez pas encore d'entreprises dans votre base de données. Les entreprises seront automatiquement ajoutées lorsque vous importerez des leads."
-                }
-                icon={Table2}
-              />
+              <div className="flex min-h-0 flex-1 items-center justify-center">
+                <EmptyState
+                  title="Aucune entreprise trouvée"
+                  description={
+                    Object.keys(filters).length > 0
+                      ? "Aucune entreprise ne correspond à vos critères de recherche. Essayez de modifier vos filtres."
+                      : "Vous n'avez pas encore d'entreprises dans votre base de données. Les entreprises seront automatiquement ajoutées lorsque vous importerez des leads."
+                  }
+                  icon={Table2}
+                />
+              </div>
             ) : (
               <>
-                {viewMode === "cards" ? (
-                  <CompaniesCardView companies={companies} />
-                ) : (
-                  <CompaniesTableView companies={companies} />
-                )}
+                <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-border/80 scrollbar-table">
+                  {viewMode === "cards" ? (
+                    <CompaniesCardView companies={companies} />
+                  ) : (
+                    <CompaniesTableView companies={companies} />
+                  )}
+                </div>
 
-                {/* Pagination */}
                 {pagination && pagination.totalPages > 1 && (
-                  <div className="mt-6 space-y-4">
+                  <div className="shrink-0 space-y-4 pt-2">
                     <PaginationInfo
                       currentPage={currentPage}
                       totalItems={pagination.totalItems}

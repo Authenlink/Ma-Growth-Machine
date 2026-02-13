@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
@@ -19,7 +20,11 @@ interface TechnologyBadgesProps {
   className?: string;
 }
 
-const SIMPLE_ICONS_CDN = "https://cdn.simpleicons.org";
+// cdn.simpleicons.org: icônes colorées + support dark mode (/_/fff = blanc en dark)
+// Fallback jsDelivr pour les slugs qui 404 (amazonaws, microsoftoutlook, etc.)
+const CDN_COLORED = "https://cdn.simpleicons.org";
+const CDN_FALLBACK =
+  "https://cdn.jsdelivr.net/npm/simple-icons@latest/icons";
 
 function TechBadge({
   item,
@@ -28,19 +33,32 @@ function TechBadge({
   item: TechnologyItem;
   size?: "sm" | "md";
 }) {
+  const [useFallback, setUseFallback] = useState(false);
+  const [iconError, setIconError] = useState(false);
   const sizeClass = size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4";
   const badgeClass = size === "sm" ? "text-xs gap-1 px-1.5 py-0" : "text-xs gap-1.5 px-2 py-0.5";
+
+  const showIcon = item.iconSlug && !iconError;
+  const iconUrl = useFallback
+    ? `${CDN_FALLBACK}/${item.iconSlug}.svg`
+    : `${CDN_COLORED}/${item.iconSlug}/_/ffffff`;
+
+  const handleIconError = () => {
+    if (!useFallback) setUseFallback(true);
+    else setIconError(true);
+  };
 
   const content = (
     <Badge
       variant="secondary"
       className={`${badgeClass} font-normal bg-muted/80 hover:bg-muted transition-colors border border-border/60`}
     >
-      {item.iconSlug ? (
+      {showIcon ? (
         <img
-          src={`${SIMPLE_ICONS_CDN}/${item.iconSlug}`}
+          src={iconUrl}
           alt=""
-          className={`${sizeClass} rounded-sm object-contain`}
+          className={`${sizeClass} rounded-sm object-contain tech-icon`}
+          onError={handleIconError}
         />
       ) : (
         <Code2 className={`${sizeClass} text-muted-foreground`} />

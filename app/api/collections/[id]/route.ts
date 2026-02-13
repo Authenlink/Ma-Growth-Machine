@@ -122,10 +122,7 @@ export async function GET(
         );
       }
       if (mapperType === "email-verify") {
-        return and(
-          isNotNull(leads.emailVerifyEmaillist),
-          ne(leads.emailVerifyEmaillist, "")
-        )!;
+        return sql`${leads.emailVerifyEmaillist} IN ('ok', 'ok_for_all', 'valid')`;
       }
       return sql`true`;
     });

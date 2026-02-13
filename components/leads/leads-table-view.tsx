@@ -97,7 +97,7 @@ export function LeadsTableView({ leads, onDeleteLead }: LeadsTableViewProps) {
     `${cellClass} sticky left-0 z-[1] min-w-[180px] border-r border-border shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] ${isEvenRow ? "bg-muted" : "bg-background"}`;
 
   return (
-    <div className="w-full min-w-0 rounded-md border max-h-[calc(100vh-250px)] overflow-auto">
+    <div className="w-full min-w-0">
       <div className="min-w-max">
         <table className="w-full min-w-max border-collapse">
           <thead>

@@ -48,7 +48,7 @@ const hasTrustpilot = exists(
 export function buildLeadScoreSqlExpression() {
   return sql<number>`LEAST(10, (
     CASE WHEN ${leads.email} IS NOT NULL AND TRIM(${leads.email}) != '' THEN 2 ELSE 0 END +
-    CASE WHEN ${leads.emailVerifyEmaillist} IS NOT NULL AND TRIM(${leads.emailVerifyEmaillist}) != '' THEN 1 ELSE 0 END +
+    CASE WHEN ${leads.emailVerifyEmaillist} IN ('ok', 'ok_for_all', 'valid') THEN 1 ELSE 0 END +
     CASE WHEN ${leads.linkedinUrl} IS NOT NULL AND TRIM(${leads.linkedinUrl}) != '' THEN 1 ELSE 0 END +
     CASE WHEN ${companies.linkedinUrl} IS NOT NULL AND TRIM(${companies.linkedinUrl}) != '' THEN 1 ELSE 0 END +
     CASE WHEN ${leads.firstName} IS NOT NULL AND TRIM(${leads.firstName}) != '' THEN 0.5 ELSE 0 END +

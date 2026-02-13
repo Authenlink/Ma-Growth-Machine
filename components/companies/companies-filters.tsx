@@ -4,10 +4,10 @@ import { useState, useEffect } from "react";
 import { ChevronDown, ChevronUp, X, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { SourcesFilterDropdown } from "@/components/sources-filter-dropdown";
 import { ScoreFilterDropdown } from "@/components/score-filter-dropdown";
+import { VerifiedEmailFilterDropdown } from "@/components/verified-email-filter-dropdown";
 
 interface CompaniesFiltersProps {
   filters: {
@@ -18,6 +18,7 @@ interface CompaniesFiltersProps {
     city?: string;
     sourceTypes?: string[];
     scoreCategory?: string;
+    verifiedEmail?: string;
   };
   onFiltersChange: (filters: CompaniesFiltersProps["filters"]) => void;
   resultCount?: number;
@@ -37,7 +38,7 @@ export function CompaniesFilters({
   }, [filters]);
 
   const handleFilterChange = (key: string, value: string | undefined) => {
-    if (key === "sourceTypes" || key === "scoreCategory") return;
+    if (key === "sourceTypes" || key === "scoreCategory" || key === "verifiedEmail") return;
     const newFilters = { ...localFilters };
     if (value === "" || value === undefined) {
       delete newFilters[key as keyof typeof newFilters];
@@ -70,6 +71,17 @@ export function CompaniesFilters({
     onFiltersChange(newFilters);
   };
 
+  const handleVerifiedEmailChange = (verifiedEmail: string | undefined) => {
+    const newFilters = { ...localFilters };
+    if (!verifiedEmail) {
+      delete newFilters.verifiedEmail;
+    } else {
+      newFilters.verifiedEmail = verifiedEmail;
+    }
+    setLocalFilters(newFilters);
+    onFiltersChange(newFilters);
+  };
+
   const handleResetFilters = () => {
     const emptyFilters = {};
     setLocalFilters(emptyFilters);
@@ -83,61 +95,8 @@ export function CompaniesFilters({
 
   return (
     <div className="space-y-4">
-      {/* Filtres principaux */}
+      {/* Une seule ligne : Filtres avancés, Nom entreprise, Industrie, Sources, Note, Email vérifié */}
       <div className="rounded-xl border border-border/80 bg-card/30 p-4">
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex-1 min-w-[200px]">
-            <Label htmlFor="filter-company-name" className="text-xs font-medium mb-1.5 block">
-              Nom de l&apos;entreprise
-            </Label>
-            <Input
-            id="filter-company-name"
-            placeholder="Rechercher une entreprise..."
-            value={localFilters.name || ""}
-            onChange={(e) =>
-              handleFilterChange("name", e.target.value || undefined)
-            }
-          />
-        </div>
-
-        <div className="flex-1 min-w-[200px]">
-          <Label htmlFor="filter-industry" className="text-xs mb-1.5 block">
-            Industrie
-          </Label>
-          <Input
-            id="filter-industry"
-            placeholder="Ex: Technology, Finance..."
-            value={localFilters.industry || ""}
-            onChange={(e) =>
-              handleFilterChange("industry", e.target.value || undefined)
-            }
-          />
-        </div>
-
-        {hasActiveFilters && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleResetFilters}
-            className="gap-2"
-          >
-            <X className="h-4 w-4" />
-            Réinitialiser
-          </Button>
-        )}
-        </div>
-      </div>
-
-      {/* Compteur de résultats */}
-      {resultCount !== undefined && (
-        <div className="text-sm text-muted-foreground">
-          {resultCount} entreprise{resultCount !== 1 ? "s" : ""} trouvée
-          {resultCount !== 1 ? "s" : ""}
-        </div>
-      )}
-
-      {/* Filtres avancés, Sources et Note */}
-      <div className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="ghost"
@@ -153,6 +112,24 @@ export function CompaniesFilters({
               <ChevronDown className="h-4 w-4" />
             )}
           </Button>
+          <Input
+            id="filter-company-name"
+            placeholder="Nom entreprise..."
+            className="h-8 w-[160px] min-w-[140px]"
+            value={localFilters.name || ""}
+            onChange={(e) =>
+              handleFilterChange("name", e.target.value || undefined)
+            }
+          />
+          <Input
+            id="filter-industry"
+            placeholder="Industrie..."
+            className="h-8 w-[160px] min-w-[140px]"
+            value={localFilters.industry || ""}
+            onChange={(e) =>
+              handleFilterChange("industry", e.target.value || undefined)
+            }
+          />
           <SourcesFilterDropdown
             selectedSourceTypes={filters.sourceTypes ?? []}
             onChange={handleSourceTypesChange}
@@ -162,7 +139,34 @@ export function CompaniesFilters({
             selectedCategory={filters.scoreCategory}
             onChange={handleScoreCategoryChange}
           />
+          <VerifiedEmailFilterDropdown
+            selectedFilter={filters.verifiedEmail as "verified" | "unverified" | "all" | undefined}
+            onChange={handleVerifiedEmailChange}
+          />
+          {hasActiveFilters && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleResetFilters}
+              className="gap-2"
+            >
+              <X className="h-4 w-4" />
+              Réinitialiser
+            </Button>
+          )}
         </div>
+      </div>
+
+      {/* Compteur de résultats */}
+      {resultCount !== undefined && (
+        <div className="text-sm text-muted-foreground">
+          {resultCount} entreprise{resultCount !== 1 ? "s" : ""} trouvée
+          {resultCount !== 1 ? "s" : ""}
+        </div>
+      )}
+
+      {/* Panneau Filtres avancés expandable */}
+      <div className="flex flex-col gap-4">
         {isAdvancedOpen && (
           <div className="rounded-xl border border-border/80 bg-card/30 p-4 w-full">
             <FieldGroup className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

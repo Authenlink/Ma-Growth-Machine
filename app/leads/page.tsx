@@ -234,9 +234,9 @@ export default function LeadsPage() {
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset>
+      <SidebarInset className="flex h-dvh flex-col overflow-hidden">
         <header
-          className={`sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 ${
+          className={`flex h-16 shrink-0 items-center gap-2 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 ${
             hasScrolled ? "border-b" : ""
           }`}
         >
@@ -262,8 +262,8 @@ export default function LeadsPage() {
           </div>
         </header>
 
-        <div className="flex min-w-0 flex-1 flex-col gap-4 p-4 pt-6 overflow-x-hidden">
-          <div className="flex items-center justify-between mb-2">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 p-4 pt-6 overflow-hidden">
+          <div className="flex shrink-0 items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold">Leads</h1>
               <p className="text-muted-foreground">
@@ -293,61 +293,70 @@ export default function LeadsPage() {
           </div>
 
           {collections.length === 0 ? (
-            <EmptyState
-              title="Aucune collection"
-              description="Pour commencer à gérer vos leads, vous devez d'abord créer une collection. Les leads seront ensuite organisés dans vos collections."
-              actionLabel="Créer une collection"
-              actionHref="/leads/collections/new"
-              icon={FolderOpen}
-            />
-          ) : (
-            <div className="space-y-4 min-w-0">
-              <LeadsFilters
-                collections={collections}
-                folders={folders}
-                filters={filters}
-                onFiltersChange={setFilters}
-                resultCount={pagination?.totalItems || 0}
+            <div className="flex min-h-0 flex-1 items-center justify-center">
+              <EmptyState
+                title="Aucune collection"
+                description="Pour commencer à gérer vos leads, vous devez d'abord créer une collection. Les leads seront ensuite organisés dans vos collections."
+                actionLabel="Créer une collection"
+                actionHref="/leads/collections/new"
+                icon={FolderOpen}
               />
+            </div>
+          ) : (
+            <div className="flex min-h-0 flex-1 flex-col gap-4 min-w-0">
+              <div className="shrink-0 space-y-2">
+                <LeadsFilters
+                  collections={collections}
+                  folders={folders}
+                  filters={filters}
+                  onFiltersChange={setFilters}
+                  resultCount={pagination?.totalItems || 0}
+                />
+              </div>
 
               {loadingLeads ? (
-                <div className="space-y-4">
-                  {viewMode === "cards" ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {[...Array(6)].map((_, i) => (
-                        <Skeleton key={i} className="h-64 rounded-lg" />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <Skeleton className="h-12 w-full rounded-md" />
-                      {[...Array(5)].map((_, i) => (
-                        <Skeleton key={i} className="h-16 w-full rounded-md" />
-                      ))}
-                    </div>
-                  )}
+                <div className="flex min-h-0 flex-1 overflow-auto rounded-xl border border-border/80 scrollbar-table">
+                  <div className="w-full space-y-4">
+                    {viewMode === "cards" ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {[...Array(6)].map((_, i) => (
+                          <Skeleton key={i} className="h-64 rounded-lg" />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Skeleton className="h-12 w-full rounded-md" />
+                        {[...Array(5)].map((_, i) => (
+                          <Skeleton key={i} className="h-16 w-full rounded-md" />
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               ) : leads.length === 0 ? (
-                <EmptyState
-                  title="Aucun lead trouvé"
-                  description={
-                    Object.keys(filters).length > 0
-                      ? "Aucun lead ne correspond à vos critères de recherche. Essayez de modifier vos filtres."
-                      : "Vous n'avez pas encore de leads. Commencez par scraper des leads dans une collection."
-                  }
-                  icon={FolderOpen}
-                />
+                <div className="flex min-h-0 flex-1 items-center justify-center">
+                  <EmptyState
+                    title="Aucun lead trouvé"
+                    description={
+                      Object.keys(filters).length > 0
+                        ? "Aucun lead ne correspond à vos critères de recherche. Essayez de modifier vos filtres."
+                        : "Vous n'avez pas encore de leads. Commencez par scraper des leads dans une collection."
+                    }
+                    icon={FolderOpen}
+                  />
+                </div>
               ) : (
                 <>
-                  {viewMode === "cards" ? (
-                    <LeadsCardView leads={leads} />
-                  ) : (
-                    <LeadsTableView leads={leads} />
-                  )}
+                  <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-border/80 scrollbar-table">
+                    {viewMode === "cards" ? (
+                      <LeadsCardView leads={leads} />
+                    ) : (
+                      <LeadsTableView leads={leads} />
+                    )}
+                  </div>
 
-                  {/* Pagination */}
                   {pagination && pagination.totalPages > 1 && (
-                    <div className="mt-6 space-y-4">
+                    <div className="shrink-0 space-y-4 pt-2">
                       <PaginationInfo
                         currentPage={currentPage}
                         totalItems={pagination.totalItems}

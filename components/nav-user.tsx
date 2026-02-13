@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { signOut } from "next-auth/react";
 import {
   ChevronsUpDown,
@@ -54,7 +55,15 @@ export function NavUser({
     css: string;
   } | null;
 }) {
-  const { isMobile } = useSidebar();
+  const { isMobile, setOpen, setOpenMobile } = useSidebar();
+
+  const handleNavClick = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    } else {
+      setOpen(false);
+    }
+  };
   const { theme, setTheme } = useTheme();
 
   const handleSignOut = () => {
@@ -149,11 +158,11 @@ export function NavUser({
 
             {/* Liens */}
             <DropdownMenuGroup>
-              <DropdownMenuItem
-                onClick={() => (window.location.href = "/profile")}
-              >
-                <User />
-                Profil
+              <DropdownMenuItem asChild>
+                <Link href="/profile" onClick={handleNavClick}>
+                  <User />
+                  Profil
+                </Link>
               </DropdownMenuItem>
             </DropdownMenuGroup>
 

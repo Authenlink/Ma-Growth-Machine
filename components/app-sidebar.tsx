@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import {
   LayoutDashboard,
   Users,
@@ -26,6 +27,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  useSidebar,
 } from "@/components/ui/sidebar";
 
 // ============================================================
@@ -178,13 +180,44 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   }
 
   return (
-    <Sidebar collapsible="icon" {...props}>
+    <SidebarWithNav
+      user={user}
+      backgroundGradient={backgroundGradient}
+      collapsible="icon"
+      {...props}
+    />
+  );
+}
+
+function SidebarWithNav(
+  props: React.ComponentProps<typeof Sidebar> & {
+    user: { name: string; email: string; avatar: string };
+    backgroundGradient: {
+      color1: string;
+      color2: string;
+      css: string;
+    } | null;
+  }
+) {
+  const { user, backgroundGradient, ...sidebarProps } = props;
+  const { setOpen, setOpenMobile, isMobile } = useSidebar();
+
+  const handleNavClick = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    } else {
+      setOpen(false);
+    }
+  };
+
+  return (
+    <Sidebar collapsible="icon" {...sidebarProps}>
       {/* Header : Logo + Nom de l'app */}
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <a href="/dashboard">
+              <Link href="/dashboard" onClick={handleNavClick}>
                 <div className="flex aspect-square size-8 items-center justify-center">
                   <Image
                     src="/logo.png"
@@ -200,7 +233,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     Lead Generation Platform
                   </span>
                 </div>
-              </a>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

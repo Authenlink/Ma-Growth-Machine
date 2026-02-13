@@ -69,9 +69,9 @@
   --ring: oklch(0.708 0 0);
   --chart-1: oklch(0.809 0.105 251.813);
   --chart-2: oklch(0.623 0.214 259.815);
-  --chart-3: oklch(0.546 0.245 262.881);
-  --chart-4: oklch(0.488 0.243 264.376);
-  --chart-5: oklch(0.424 0.199 265.638);
+  --chart-3: oklch(0.65 0.15 85); /* Orange pour les coûts */
+  --chart-4: oklch(0.6 0.2 240); /* Bleu pour les réussies */
+  --chart-5: oklch(0.55 0.2 350); /* Rouge pour les échouées */
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.141 0.005 285.823);
   --sidebar-primary: oklch(0.546 0.245 262.881);
@@ -125,9 +125,9 @@
   /* Charts - Palette Neon colorée */
   --chart-1: oklch(0.7 0.2 195); /* Cyan électrique */
   --chart-2: oklch(0.68 0.19 170); /* Vert-cyan */
-  --chart-3: oklch(0.66 0.18 150); /* Vert */
-  --chart-4: oklch(0.68 0.2 280); /* Violet */
-  --chart-5: oklch(0.7 0.21 310); /* Magenta */
+  --chart-3: oklch(0.66 0.18 150); /* Vert - pour les coûts */
+  --chart-4: oklch(0.68 0.2 280); /* Violet - pour les réussies */
+  --chart-5: oklch(0.7 0.21 310); /* Magenta - pour les échouées */
 
   /* Sidebar - Légèrement différent du background */
   --sidebar: oklch(0.2 0.016 220);
@@ -161,9 +161,9 @@
   --ring: oklch(0.556 0 0);
   --chart-1: oklch(0.809 0.105 251.813);
   --chart-2: oklch(0.623 0.214 259.815);
-  --chart-3: oklch(0.546 0.245 262.881);
-  --chart-4: oklch(0.488 0.243 264.376);
-  --chart-5: oklch(0.424 0.199 265.638);
+  --chart-3: oklch(0.7 0.18 120); /* Vert-jaune pour les coûts */
+  --chart-4: oklch(0.65 0.2 200); /* Cyan pour les réussies */
+  --chart-5: oklch(0.65 0.22 340); /* Rose pour les échouées */
   --sidebar: oklch(0.21 0.006 285.885);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.623 0.214 259.815);
@@ -181,4 +181,46 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Icônes tech : en dark mode, blanches pour visibilité sur fond sombre */
+.tech-icon {
+  opacity: 0.9;
+}
+.dark .tech-icon {
+  filter: brightness(0) invert(1);
+  opacity: 0.95;
+}
+
+/* Scrollbar personnalisée pour les tableaux - thème cohérent */
+.scrollbar-table {
+  scrollbar-width: thin;
+  scrollbar-gutter: stable;
+  scrollbar-color: var(--muted) transparent;
+}
+.scrollbar-table::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.scrollbar-table::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 10px;
+}
+.scrollbar-table::-webkit-scrollbar-thumb {
+  background: var(--muted);
+  border-radius: 10px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+.scrollbar-table::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+  background-clip: padding-box;
+}
+.scrollbar-table::-webkit-scrollbar-thumb:active {
+  background: var(--primary);
+  background-clip: padding-box;
+}
+.scrollbar-table::-webkit-scrollbar-corner {
+  background: transparent;
+  border-radius: 0 0 10px 0;
 }

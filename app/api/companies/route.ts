@@ -9,7 +9,7 @@ import {
   leads,
 } from "@/lib/schema";
 import { extractDomain } from "@/lib/bulk-email-finder-mapper";
-import { and, like, sql, eq, exists, isNotNull, ne, getTableColumns } from "drizzle-orm";
+import { and, or, like, sql, eq, exists, isNotNull, isNull, ne, getTableColumns } from "drizzle-orm";
 import {
   FILTERABLE_SOURCE_TYPES,
   SOURCE_USE_ENTITY_SCRAPER_USAGES,
@@ -61,6 +61,8 @@ export async function GET(request: NextRequest) {
         ? (scoreCategoryRaw as ScoreCategory)
         : null;
 
+    const verifiedEmail = searchParams.get("verifiedEmail");
+
     // Paramètres de pagination
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "50");
@@ -104,6 +106,37 @@ export async function GET(request: NextRequest) {
       conditions.push(like(companies.city, `%${city.trim()}%`));
     }
 
+    // Filtre par email vérifié
+    if (verifiedEmail && verifiedEmail !== "all") {
+      if (verifiedEmail === "verified") {
+        // Entreprise avec au moins un lead ayant un email vérifié
+        conditions.push(
+          exists(
+            db
+              .select()
+              .from(leads)
+              .where(
+                and(
+                  eq(leads.companyId, companies.id),
+                  eq(leads.userId, userId),
+                  sql`${leads.emailVerifyEmaillist} IN ('ok', 'ok_for_all', 'valid')`
+                )
+              )
+          )
+        );
+      } else if (verifiedEmail === "unverified") {
+        // Entreprise sans lead ayant un email vérifié (tous les leads ont des emails non vérifiés ou pas d'email)
+        conditions.push(
+          sql`NOT EXISTS (
+            SELECT 1 FROM ${leads}
+            WHERE ${leads.companyId} = ${companies.id}
+            AND ${leads.userId} = ${userId}
+            AND ${leads.emailVerifyEmaillist} IN ('ok', 'ok_for_all', 'valid')
+          )`
+        );
+      }
+    }
+
     // Filtre par sources (enrichissements) - AND : l'entreprise doit avoir la source pour chaque mapperType
     const sourceTypeConditions = sourceTypes.map((mapperType) => {
       if (SOURCE_USE_ENTITY_SCRAPER_USAGES[mapperType] !== false) {
@@ -143,8 +176,7 @@ export async function GET(request: NextRequest) {
               and(
                 eq(leads.companyId, companies.id),
                 eq(leads.userId, userId),
-                isNotNull(leads.emailVerifyEmaillist),
-                ne(leads.emailVerifyEmaillist, "")
+                sql`${leads.emailVerifyEmaillist} IN ('ok', 'ok_for_all', 'valid')`
               )
             )
         );

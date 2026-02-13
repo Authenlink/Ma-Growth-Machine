@@ -10,7 +10,7 @@ import {
   scrapers,
   trustpilotReviews,
 } from "@/lib/schema";
-import { eq, and, or, like, desc, sql, inArray, exists, isNotNull, ne } from "drizzle-orm";
+import { eq, and, or, like, desc, sql, inArray, exists, isNotNull, isNull, ne } from "drizzle-orm";
 import {
   FILTERABLE_SOURCE_TYPES,
   SOURCE_ENTITY_TYPE,
@@ -62,6 +62,8 @@ export async function GET(request: NextRequest) {
         ? (scoreCategoryRaw as ScoreCategory)
         : null;
 
+    const verifiedEmail = searchParams.get("verifiedEmail");
+
     // Paramètres de pagination
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "50");
@@ -108,6 +110,17 @@ export async function GET(request: NextRequest) {
     // Filtre par validated
     if (validated !== null && validated !== undefined && validated !== "") {
       conditions.push(eq(leads.validated, validated === "true"));
+    }
+
+    // Filtre par email vérifié
+    if (verifiedEmail && verifiedEmail !== "all") {
+      if (verifiedEmail === "verified") {
+        // Email vérifié : valeurs "ok", "ok_for_all", "valid"
+        conditions.push(sql`${leads.emailVerifyEmaillist} IN ('ok', 'ok_for_all', 'valid')`);
+      } else if (verifiedEmail === "unverified") {
+        // Email non vérifié : autres valeurs ou null/vide
+        conditions.push(sql`(${leads.emailVerifyEmaillist} IS NULL OR ${leads.emailVerifyEmaillist} = '' OR ${leads.emailVerifyEmaillist} NOT IN ('ok', 'ok_for_all', 'valid'))`);
+      }
     }
 
     // Filtre par nom d'entreprise (sera ajouté après le join)
